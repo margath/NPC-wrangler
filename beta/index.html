@@ -21,7 +21,7 @@
             font-family: system-ui, -apple-system, sans-serif;
             margin: 0; background-color: var(--bg-dark); color: var(--text-light);
             display: flex; flex-direction: column; min-height: 100vh;
-            padding-bottom: 40px; /* Space for privacy policy */
+            padding-bottom: 40px; 
         }
 
         /* Top Bar */
@@ -33,7 +33,6 @@
         }
 
         header h1 { margin: 0; font-size: 20px; display: flex; align-items: center; gap: 15px; }
-
         .header-controls { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
 
         .dm-toolbar {
@@ -77,12 +76,17 @@
         .npc-card.travelling { border: 2px solid var(--accent-green); }
         .npc-card.hometown-focus { border: 2px solid var(--accent-blue); }
         .pc-card { border-left: 5px solid var(--accent-gold); }
+        
         .card-content { padding: 15px; flex-grow: 1; display: flex; flex-direction: column; gap: 8px; }
         .name-row { display: flex; justify-content: space-between; align-items: flex-start; }
         .title { font-size: 20px; font-weight: bold; margin: 0; }
         .meta { font-size: 11px; text-transform: uppercase; color: #aaa; font-weight: bold; }
+        
         .desc-box { background: #1a1a20; padding: 10px; border-radius: 4px; font-size: 13px; border: 1px solid #333; white-space: pre-wrap; }
         .secret-box { background: #2d1b2d; border: 1px solid var(--accent-purple); color: #d192e8; padding: 10px; border-radius: 4px; font-size: 13px; font-style: italic; }
+
+        .tag-line { margin-top: 5px; font-size: 13px; color: #ccc; }
+        .badge-tag { background: var(--accent-gold); color: #000; padding: 2px 8px; border-radius: 12px; font-weight: bold; font-size: 11px; text-transform: uppercase; }
 
         .status-tray { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 5px; }
         .status-badge { font-size: 10px; padding: 2px 6px; border-radius: 3px; background: #444; color: #eee; font-weight: bold; text-transform: uppercase; }
@@ -101,7 +105,6 @@
         .btn-setup { background: #7f8c8d; color: white; }
         .btn-setup.configured { background: var(--accent-green); color: #111; }
 
-        /* Modal Toggle Buttons (Replaces Checkboxes) */
         .toggle-btn { background: #111; color: #aaa; border: 1px solid #444; padding: 8px 10px; font-size: 12px; width: 100%; text-align: center; }
         .toggle-btn.active { background: var(--accent-green); color: #111; border-color: var(--accent-green); }
         .toggle-btn.active-status { background: var(--accent-red); color: white; border-color: var(--accent-red); }
@@ -111,7 +114,6 @@
         
         #toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: #333; color: white; padding: 10px 20px; border-radius: 20px; opacity: 0; transition: opacity 0.3s; z-index: 2000; font-weight: bold; pointer-events: none; }
 
-        /* Fixed Links */
         .privacy-link { position: fixed; bottom: 10px; left: 15px; font-size: 11px; color: #888; text-decoration: none; z-index: 100; transition: color 0.2s; }
         .privacy-link:hover { color: var(--accent-blue); text-decoration: underline; }
     </style>
@@ -131,7 +133,7 @@
         </h1>
         <div class="header-controls">
             <button id="btn-load" class="btn-setup" style="display:none;" onclick="loadFromCloud()">📥 Sync</button>
-            <button id="login-btn" style="background:#444; color:white;" onclick="handleLogin()">👤 Log In</button>
+            <button id="login-btn-display" style="background:#444; color:white;" onclick="openLoginModal()">👤 Log In</button>
             <button class="btn-add" onclick="openNPCModal()">+ New NPC</button>
             <button id="setup-btn-header" class="btn-setup" onclick="openSetup()">⚙️ Setup Cloud</button>
         </div>
@@ -144,8 +146,7 @@
         <button class="btn-init" onclick="toggleInitiative()">⚔️ Toggle Combat</button>
     </div>
 
-    <main id="main-grid" class="grid-view">
-        </main>
+    <main id="main-grid" class="grid-view"></main>
 
     <a href="/privacy" class="privacy-link" target="_blank">Privacy Policy</a>
 
@@ -161,6 +162,7 @@
                     <li>Click <strong>Deploy > New deployment</strong>. Select type <strong>Web app</strong>.</li>
                     <li>Set 'Execute as' to <strong>Me</strong> and 'Who has access' to <strong>Anyone</strong>.</li>
                     <li>Click Deploy, Authorize permissions, and copy the <strong>Web app URL</strong>.</li>
+                    <li><em>Note: After your first sync, edit the 'pin' column in your new PCs sheet to set player passwords.</em></li>
                 </ol>
 
                 <div style="position: relative;">
@@ -168,13 +170,11 @@
                     <pre class="code-block" id="app-script-code">
 const NPC_SHEET = "NPCs";
 const PC_SHEET = "PCs";
-const BACKEND_VERSION = "3.0";
+const BACKEND_VERSION = "4.0";
 
 function doGet(e) {
   try {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
-    let npcs = [], pcs = [];
-
     const getSheetData = (sheetName) => {
       let s = ss.getSheetByName(sheetName);
       let arr = [];
@@ -194,11 +194,7 @@ function doGet(e) {
       }
       return arr;
     };
-
-    npcs = getSheetData(NPC_SHEET);
-    pcs = getSheetData(PC_SHEET);
-
-    return ContentService.createTextOutput(JSON.stringify({backendVersion: BACKEND_VERSION, npcs: npcs, pcs: pcs})).setMimeType(ContentService.MimeType.JSON);
+    return ContentService.createTextOutput(JSON.stringify({backendVersion: BACKEND_VERSION, npcs: getSheetData(NPC_SHEET), pcs: getSheetData(PC_SHEET)})).setMimeType(ContentService.MimeType.JSON);
   } catch(err) {
     return ContentService.createTextOutput(JSON.stringify({error: err.toString()})).setMimeType(ContentService.MimeType.JSON);
   }
@@ -216,13 +212,10 @@ function doPost(e) {
             if(dataArray && dataArray.length > 0) {
                 let headers = Object.keys(dataArray[0]);
                 let rows = [headers];
-                dataArray.forEach(item => {
-                    rows.push(headers.map(h => JSON.stringify(item[h])));
-                });
+                dataArray.forEach(item => { rows.push(headers.map(h => JSON.stringify(item[h]))); });
                 s.getRange(1, 1, rows.length, headers.length).setValues(rows);
             }
         };
-        
         saveSheet(NPC_SHEET, p.npcs);
         saveSheet(PC_SHEET, p.pcs);
         return ContentService.createTextOutput(JSON.stringify({status: "success"})).setMimeType(ContentService.MimeType.JSON);
@@ -261,6 +254,18 @@ function doPost(e) {
         </div>
     </div>
 
+    <div id="login-modal" class="modal-overlay">
+        <div class="modal-box" style="max-width: 320px; text-align: center;">
+            <h2 style="margin-top:0; border-bottom:1px solid #555; padding-bottom:10px;">Select Character</h2>
+            <select id="login-name"></select>
+            <input type="password" id="login-pin" placeholder="Enter PIN (e.g., 1111)" onkeydown="if(event.key === 'Enter') submitLogin()">
+            <div style="display:flex; flex-direction:column; gap:10px; margin-top:15px;">
+                <button class="btn-add" onclick="submitLogin()">👤 Authenticate</button>
+                <button onclick="closeModal('login-modal')" style="background:#555; color:white;">Cancel</button>
+            </div>
+        </div>
+    </div>
+
     <div id="edit-modal" class="modal-overlay">
         <div class="modal-box">
             <h2 id="modal-title" style="margin-top:0; border-bottom:1px solid #555; padding-bottom:10px;">Edit Entry</h2>
@@ -287,14 +292,14 @@ function doPost(e) {
             showInitiative: false,
             initIndex: 0,
             initiativeOrder: [],
-            lastCloudHash: "",
             autoSaveTimeout: null,
-            npcs: [
+            npcs: JSON.parse(localStorage.getItem('npcs')) || [
                 { id: 'npc_demo', name: 'Drax', hometown: 'Solomani Rim', description: 'A black-market tech dealer.', secret: 'Working for the authorities.', isTravelling: false, createdBy: 'DM' }
             ],
-            pcs: [
-                { id: 'pc1', name: 'Hank', character: 'Ranger', description: 'A grizzled scout.', statuses: [], secret: 'Owes a debt.' },
-                { id: 'pc2', name: 'Sheila', character: 'Thief', description: 'Expert in infiltration.', statuses: [], secret: 'Actually royalty in hiding.' }
+            pcs: JSON.parse(localStorage.getItem('pcs')) || [
+                { id: 'pc1', name: 'Hank', pin: '1111', character: 'Ranger', tagline: 'Tracking the Wolf', description: 'A grizzled scout.', statuses: [], secret: 'Owes a debt.' },
+                { id: 'pc2', name: 'Sheila', pin: '2222', character: 'Thief', tagline: 'Hiding in shadows', description: 'Expert in infiltration.', statuses: [], secret: 'Actually royalty.' },
+                { id: 'dm1', name: 'Dungeon Master', pin: '7777', character: 'DM', tagline: 'Weaving Fate', description: 'The orchestrator.', statuses: [], secret: 'Knows all.' }
             ]
         };
 
@@ -314,11 +319,13 @@ function doPost(e) {
 
         // --- CORE FUNCTIONS & RENDERING ---
         function renderAll() {
-            // Update UI State
             document.getElementById('setup-btn-header').className = state.scriptUrl ? 'btn-setup configured' : 'btn-setup';
             document.getElementById('setup-btn-header').innerHTML = state.scriptUrl ? '⚙️✅ Cloud Active' : '⚙️ Setup Cloud';
             document.getElementById('btn-load').style.display = state.scriptUrl ? 'block' : 'none';
-            if (state.currentUser) document.getElementById('login-btn').innerText = `User: ${state.currentUser}`;
+            if (state.currentUser) {
+                document.getElementById('login-btn-display').innerText = `User: ${state.currentUser}`;
+                document.getElementById('login-btn-display').style.background = state.isDM ? "var(--accent-purple)" : "var(--accent-blue)";
+            }
 
             const grid = document.getElementById('main-grid');
             const focus = document.getElementById('hometown-focus').value;
@@ -349,12 +356,12 @@ function doPost(e) {
 
             // 2. Party Section
             grid.innerHTML += `<div class="section-header">Party Status</div>`;
-            state.pcs.forEach(pc => {
+            state.pcs.filter(p => p.character !== 'DM').forEach(pc => {
                 const card = document.createElement('div');
                 card.className = 'card pc-card';
                 const canSeeSecret = state.isDM || state.currentUser === pc.name;
                 
-                const statusHtml = pc.statuses.map(s => {
+                const statusHtml = (pc.statuses || []).map(s => {
                     let cls = s.toLowerCase().includes('revived') ? 'revived' : s.toLowerCase().replace(/ /g,'');
                     return `<span class="status-badge ${cls}">${s}</span>`;
                 }).join('');
@@ -365,11 +372,12 @@ function doPost(e) {
                             <div><span class="meta">Player: ${pc.name}</span><h3 class="title">${pc.character}</h3></div>
                             <div class="status-tray">${statusHtml}</div>
                         </div>
+                        <div class="tag-line">Current Focus: <span class="badge-tag">${pc.tagline || 'None'}</span></div>
                         <div class="desc-box">${pc.description || 'No description set.'}</div>
                         ${canSeeSecret ? `<div class="secret-box"><strong>PC Secret:</strong> ${pc.secret || 'None'}</div>` : ''}
                         <div style="margin-top:auto; padding-top:10px; display:flex; gap:5px;">
                             <button class="btn-init" onclick="addToInit('${pc.character}')">⚔️ Roll</button>
-                            <button class="meta" style="background:#444; color:white; padding:4px 8px;" onclick="openPCModal('${pc.id}')">Edit Status</button>
+                            ${(state.isDM || state.currentUser === pc.name) ? `<button class="meta" style="background:#444; color:white; padding:4px 8px;" onclick="openPCModal('${pc.id}')">Edit Status</button>` : ''}
                         </div>
                     </div>
                 `;
@@ -416,9 +424,37 @@ function doPost(e) {
             const current = select.value;
             const towns = [...new Set(state.npcs.map(n => n.hometown).filter(t => t))];
             select.innerHTML = `<option value="">No Focus</option>`;
-            towns.sort().forEach(t => {
-                select.innerHTML += `<option value="${t}" ${t === current ? 'selected' : ''}>${t}</option>`;
+            towns.sort().forEach(t => { select.innerHTML += `<option value="${t}" ${t === current ? 'selected' : ''}>${t}</option>`; });
+        }
+
+        // --- AUTHENTICATION ---
+        function openLoginModal() {
+            if (!state.pcs || state.pcs.length === 0) { notify("No players found. Please Sync Data first."); return; }
+            const select = document.getElementById('login-name');
+            select.innerHTML = '';
+            state.pcs.forEach(pc => {
+                select.innerHTML += `<option value="${pc.name}">${pc.name} (${pc.character})</option>`;
             });
+            document.getElementById('login-pin').value = '';
+            document.getElementById('login-modal').style.display = 'flex';
+        }
+
+        function submitLogin() {
+            const name = document.getElementById('login-name').value;
+            const pin = document.getElementById('login-pin').value;
+            const user = state.pcs.find(p => p.name === name);
+            
+            if (user && String(user.pin) === String(pin)) {
+                state.currentUser = user.name;
+                state.isDM = (user.character === 'DM');
+                localStorage.setItem('user', state.currentUser);
+                localStorage.setItem('isDM', state.isDM);
+                closeModal('login-modal');
+                renderAll();
+                notify(`Welcome, ${state.currentUser}!`);
+            } else {
+                notify("Incorrect PIN.");
+            }
         }
 
         // --- CLOUD SYNC LOGIC ---
@@ -434,8 +470,7 @@ function doPost(e) {
             if (!state.scriptUrl) return;
             try {
                 await fetch(state.scriptUrl, { 
-                    method: 'POST', 
-                    body: JSON.stringify({ action: 'saveData', npcs: state.npcs, pcs: state.pcs }) 
+                    method: 'POST', body: JSON.stringify({ action: 'saveData', npcs: state.npcs, pcs: state.pcs }) 
                 });
                 document.getElementById('btn-load').innerText = "📥 Sync";
             } catch(e) { notify("Cloud save failed."); }
@@ -448,8 +483,12 @@ function doPost(e) {
             try {
                 const response = await fetch(state.scriptUrl);
                 const data = await response.json();
-                if (data.npcs) state.npcs = data.npcs;
-                if (data.pcs) state.pcs = data.pcs;
+                if (data.npcs && data.npcs.length > 0) state.npcs = data.npcs;
+                if (data.pcs && data.pcs.length > 0) state.pcs = data.pcs;
+                
+                // Save locally so offline mode works
+                localStorage.setItem('npcs', JSON.stringify(state.npcs));
+                localStorage.setItem('pcs', JSON.stringify(state.pcs));
             } catch(e) { console.error(e); notify("Failed to load cloud data."); }
             btn.innerText = "📥 Sync"; btn.disabled = false;
             renderAll();
@@ -473,8 +512,7 @@ function doPost(e) {
             state.scriptUrl = document.getElementById('script-url-input').value.trim();
             localStorage.setItem('campaignScriptUrl', state.scriptUrl);
             closeModal('setup-screen');
-            if (state.scriptUrl) loadFromCloud();
-            else renderAll();
+            if (state.scriptUrl) loadFromCloud(); else renderAll();
         }
 
         function disconnectCloud() {
@@ -484,13 +522,11 @@ function doPost(e) {
 
         function copyJoinLink() {
             let encodedCode = btoa(state.scriptUrl.match(/\/s\/([a-zA-Z0-9_-]+)\//)?.[1] || state.scriptUrl);
-            navigator.clipboard.writeText(window.location.href.split('?')[0] + "?j=" + encodedCode);
-            notify("Join Link copied!");
+            navigator.clipboard.writeText(window.location.href.split('?')[0] + "?j=" + encodedCode); notify("Join Link copied!");
         }
-
         function copyScriptCode() { navigator.clipboard.writeText(document.getElementById('app-script-code').innerText); notify("Script Copied!"); }
 
-        // --- EDIT MODAL LOGIC (Using Buttons instead of Checkboxes) ---
+        // --- EDIT MODAL LOGIC ---
         function openNPCModal(id = null) {
             const npc = state.npcs.find(n => n.id === id) || { name: '', hometown: '', description: '', secret: '', isTravelling: false };
             const fields = document.getElementById('modal-fields');
@@ -524,6 +560,7 @@ function doPost(e) {
             `).join('');
 
             fields.innerHTML = `
+                <input type="text" id="f-tagline" placeholder="Current Action/Tagline" value="${pc.tagline || ''}">
                 <textarea id="f-desc" placeholder="Character Description" style="height:80px;">${pc.description}</textarea>
                 <textarea id="f-secret" placeholder="Personal Plot Hooks (DM/Owner Only)" style="height:60px;">${pc.secret}</textarea>
                 <div style="margin-top:10px; border-top:1px solid #444; padding-top:10px;">
@@ -556,9 +593,9 @@ function doPost(e) {
                 else state.npcs.push(data);
             } else {
                 const pc = state.pcs.find(p => p.id === id);
+                pc.tagline = document.getElementById('f-tagline').value;
                 pc.description = document.getElementById('f-desc').value;
                 pc.secret = document.getElementById('f-secret').value;
-                // Read active status buttons
                 pc.statuses = Array.from(document.querySelectorAll('.status-btn.active-status')).map(el => el.value);
             }
 
@@ -581,21 +618,12 @@ function doPost(e) {
         function clearInit() { if(confirm("Clear combat?")) { state.initiativeOrder = []; state.initIndex = 0; renderAll(); }}
         function removeFromInit(i) { state.initiativeOrder.splice(i, 1); renderAll(); }
 
-        // --- UTILS ---
-        function handleLogin() {
-            const user = prompt("Enter Name (or 'DM'):", state.currentUser || "");
-            if (user) {
-                state.currentUser = user; state.isDM = (user.toLowerCase() === 'dm');
-                localStorage.setItem('user', user); localStorage.setItem('isDM', state.isDM);
-                renderAll(); notify(`Logged in as ${user}`);
-            }
-        }
-
+        // --- CAMPAIGN UTILS ---
         function performLongRest() {
             if(!confirm("End the day? Most statuses will clear, and 'Revived' penalties will decrease.")) return;
 
             state.pcs.forEach(pc => {
-                pc.statuses = pc.statuses.map(s => {
+                pc.statuses = (pc.statuses || []).map(s => {
                     if (s === "Revived -3") return "Revived -2";
                     if (s === "Revived -2") return "Revived -1";
                     if (s === "Revived -1") return null;
@@ -615,9 +643,10 @@ function doPost(e) {
             log += `==========================================\n\n`;
 
             log += `PARTY STATUS:\n`;
-            state.pcs.forEach(pc => {
-                const statusStr = pc.statuses.length ? `[${pc.statuses.join(', ').toUpperCase()}] ` : '';
-                log += `${pc.character.padEnd(12)}: ${statusStr}${pc.description}\n`;
+            state.pcs.filter(p => p.character !== 'DM').forEach(pc => {
+                const statusStr = (pc.statuses || []).length ? `[${pc.statuses.join(', ').toUpperCase()}] ` : '';
+                const taglineStr = pc.tagline ? `[${pc.tagline.toUpperCase()}] ` : '';
+                log += `${pc.character.padEnd(12)}: ${statusStr}${taglineStr}${pc.description}\n`;
             });
 
             log += `\nACTIVE COMPANIONS:\n`;
@@ -633,12 +662,6 @@ function doPost(e) {
             const a = document.createElement('a');
             a.href = window.URL.createObjectURL(blob); a.download = 'SessionLog.txt'; a.click();
             notify("Log exported to text file.");
-        }
-
-        function notify(msg) {
-            const t = document.getElementById('toast');
-            t.innerText = msg; t.style.opacity = 1;
-            setTimeout(() => t.style.opacity = 0, 2500);
         }
     </script>
 </body>
