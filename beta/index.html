@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NPC & Combat Tracker</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+    <style>
+        :root {
+            --bg-dark: #1e1e24;
+            --card-bg: #2a2a35;
+            --accent-blue: #3498db;
+            --accent-green: #2ecc71;
+            --accent-purple: #9b59b6;
+            --accent-gold: #f1c40f;
+            --accent-red: #e74c3c;
+            --text-light: #e0e0e0;
+        }
+
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            margin: 0; background-color: var(--bg-dark); color: var(--text-light);
+            display: flex; flex-direction: column; min-height: 100vh;
+        }
+
+        header {
+            background: #2b2b36; padding: 15px 30px; display: flex;
+            justify-content: space-between; align-items: center;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.4); border-bottom: 1px solid #444;
+        }
+
+        .dm-toolbar {
+            background: #1a1a20; padding: 10px 30px; border-bottom: 1px solid #444;
+            display: flex; gap: 15px; align-items: center; flex-wrap: wrap;
+        }
+
+        .grid-view {
+            padding: 20px 30px; display: grid; gap: 20px;
+            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+        }
+
+        .section-header {
+            grid-column: 1 / -1; font-size: 22px; border-bottom: 2px solid #444;
+            padding-bottom: 8px; margin-top: 20px; color: var(--accent-blue);
+            display: flex; justify-content: space-between; align-items: center;
+        }
+
+        /* Initiative Styles */
+        .init-tracker {
+            grid-column: 1 / -1; background: #16161d; padding: 15px; border-radius: 8px;
+            border: 1px solid #444; margin-bottom: 10px;
+        }
+        .init-list { display: flex; flex-direction: column; gap: 5px; margin-top: 10px; }
+        .init-row {
+            display: flex; align-items: center; background: #2a2a35; padding: 8px 15px;
+            border-radius: 4px; border-left: 4px solid transparent; gap: 15px;
+        }
+        .init-row.active { border-left-color: var(--accent-green); background: #34495e; }
+        .init-score { font-weight: bold; color: var(--accent-gold); width: 30px; }
+        .init-name { flex-grow: 1; font-weight: bold; }
+
+        /* Card Styles */
+        .card {
+            background: var(--card-bg); border-radius: 10px; border: 1px solid #444;
+            display: flex; flex-direction: column; overflow: hidden; position: relative;
+        }
+        .npc-card.travelling { border: 2px solid var(--accent-green); }
+        .npc-card.hometown-focus { border: 2px solid var(--accent-blue); }
+        .pc-card { border-left: 5px solid var(--accent-gold); }
+        .card-content { padding: 15px; flex-grow: 1; display: flex; flex-direction: column; gap: 8px; }
+        .name-row { display: flex; justify-content: space-between; align-items: flex-start; }
+        .title { font-size: 20px; font-weight: bold; margin: 0; }
+        .meta { font-size: 11px; text-transform: uppercase; color: #aaa; font-weight: bold; }
+        .desc-box { background: #1a1a20; padding: 10px; border-radius: 4px; font-size: 13px; border: 1px solid #333; white-space: pre-wrap; }
+        .secret-box { background: #2d1b2d; border: 1px solid var(--accent-purple); color: #d192e8; padding: 10px; border-radius: 4px; font-size: 13px; font-style: italic; }
+
+        .status-tray { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 5px; }
+        .status-badge { font-size: 10px; padding: 2px 6px; border-radius: 3px; background: #444; color: #eee; font-weight: bold; text-transform: uppercase; }
+        .status-badge.dead { background: #000; color: var(--accent-red); border: 1px solid var(--accent-red); }
+        .status-badge.unconscious { background: var(--accent-red); }
+        .status-badge.revived { background: var(--accent-blue); }
+
+        input, select, textarea { width: 100%; padding: 8px; margin: 5px 0; border-radius: 4px; border: 1px solid #444; background: #1a1a20; color: white; box-sizing: border-box; }
+        button { cursor: pointer; border: none; padding: 8px 12px; border-radius: 4px; font-weight: bold; transition: opacity 0.2s; }
+        .btn-add { background: var(--accent-green); color: #111; }
+        .btn-dm { background: var(--accent-purple); color: white; }
+        .btn-rest { background: #e67e22; color: white; }
+        .btn-init { background: var(--accent-blue); color: white; font-size: 10px; padding: 4px 8px; }
+
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 1000; display: none; justify-content: center; align-items: center; }
+        .modal-box { background: var(--card-bg); padding: 25px; border-radius: 8px; width: 90%; max-width: 500px; max-height: 90vh; overflow-y: auto; }
+        #toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: #333; color: white; padding: 10px 20px; border-radius: 20px; opacity: 0; transition: opacity 0.3s; z-index: 2000; }
+    </style>
+</head>
+<body>
+
+    <div id="toast"></div>
+
+    <header>
+        <h1 style="margin:0; font-size: 22px;">🎭 NPC & Combat Tracker</h1>
+        <div style="display: flex; gap: 10px;">
+            <button id="login-btn" onclick="handleLogin()">👤 Log In</button>
+            <button class="btn-add" onclick="openNPCModal()">+ New NPC</button>
+        </div>
+    </header>
+
+    <div class="dm-toolbar">
+        <select id="hometown-focus" style="width:180px;" onchange="renderAll()"><option value="">Hometown Focus...</option></select>
+        <button class="btn-rest" onclick="performLongRest()">⛺ Long Rest</button>
+        <button class="btn-dm" onclick="exportSessionLog()">📋 Export Log</button>
+        <button class="btn-init" onclick="toggleInitiative()">⚔️ Toggle Combat</button>
+    </div>
+
+    <main id="main-grid" class="grid-view">
+        </main>
+
+    <div id="edit-modal" class="modal-overlay">
+        <div class="modal-box">
+            <h2 id="modal-title">Edit</h2>
+            <div id="modal-fields"></div>
+            <div style="display:flex; gap:10px; margin-top:20px;">
+                <button class="btn-add" style="flex:1" onclick="saveEntry()">Save</button>
+                <button onclick="closeModal()" style="background:#555; color:white;">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const STATUS_OPTIONS = ["Incapacitated", "Unconscious", "Dead", "Blinded", "Charmed", "Frightened", "Grappled", "Paralyzed", "Petrified", "Poisoned", "Prone", "Restrained", "Stunned", "Revived -3", "Revived -2", "Revived -1"];
+        
+        let state = {
+            currentUser: localStorage.getItem('user') || null,
+            isDM: localStorage.getItem('isDM') === 'true',
+            showInitiative: false,
+            initIndex: 0,
+            initiativeOrder: [],
+            npcs: JSON.parse(localStorage.getItem('npcs')) || [],
+            pcs: JSON.parse(localStorage.getItem('pcs')) || [
+                { id: 'pc1', name: 'Hank', character: 'Ranger', description: 'A grizzled scout.', statuses: [], secret: 'Owes a debt to the Zhentarim.' },
+                { id: 'pc2', name: 'Sheila', character: 'Thief', description: 'Expert in infiltration.', statuses: [], secret: 'Actually royalty in hiding.' }
+            ]
+        };
+
+        function renderAll() {
+            const grid = document.getElementById('main-grid');
+            const focus = document.getElementById('hometown-focus').value;
+            grid.innerHTML = '';
+
+            // 1. Initiative Tracker
+            if (state.showInitiative) {
+                const initBox = document.createElement('div');
+                initBox.className = 'init-tracker';
+                initBox.innerHTML = `
+                    <div class="section-header" style="margin-top:0">⚔️ Initiative Order
+                        <div style="display:flex; gap:5px">
+                            <button onclick="prevTurn()" style="background:#444">←</button>
+                            <button onclick="nextTurn()" style="background:#444">→</button>
+                            <button onclick="clearInit()" style="background:var(--accent-red)">Reset</button>
+                        </div>
+                    </div>
+                    <div class="init-list">${state.initiativeOrder.sort((a,b) => b.score - a.score).map((char, i) => `
+                        <div class="init-row ${state.initIndex === i ? 'active' : ''}">
+                            <div class="init-score">${char.score}</div>
+                            <div class="init-name">${char.name}</div>
+                            <button class="meta" onclick="removeFromInit(${i})">×</button>
+                        </div>
+                    `).join('')}</div>
+                `;
+                grid.appendChild(initBox);
+            }
+
+            // 2. Party Section
+            grid.innerHTML += `<div class="section-header">Party Status</div>`;
+            state.pcs.forEach(pc => {
+                const card = document.createElement('div');
+                card.className = 'card pc-card';
+                const statusHtml = pc.statuses.map(s => `<span class="status-badge ${s.toLowerCase().includes('revived') ? 'revived' : s.toLowerCase().replace(/ /g,'')}">${s}</span>`).join('');
+                card.innerHTML = `
+                    <div class="card-content">
+                        <div class="name-row">
+                            <div><span class="meta">${pc.name}</span><h3 class="title">${pc.character}</h3></div>
+                            <div class="status-tray">${statusHtml}</div>
+                        </div>
+                        <div class="desc-box">${pc.description}</div>
+                        ${(state.isDM || state.currentUser === pc.name) ? `<div class="secret-box"><strong>Secret:</strong> ${pc.secret}</div>` : ''}
+                        <div style="margin-top:10px; display:flex; gap:5px;">
+                            <button class="btn-init" onclick="addToInit('${pc.character}')">⚔️ Roll</button>
+                            <button class="meta" style="background:#444; color:white;" onclick="openPCModal('${pc.id}')">Edit</button>
+                        </div>
+                    </div>
+                `;
+                grid.appendChild(card);
+            });
+
+            // 3. NPC Section
+            grid.innerHTML += `<div class="section-header">NPCs</div>`;
+            const sorted = [...state.npcs].sort((a,b) => (b.isTravelling ? 1 : b.hometown === focus ? 0 : -1) - (a.isTravelling ? 1 : a.hometown === focus ? 0 : -1) || a.name.localeCompare(b.name));
+            sorted.forEach(n => {
+                const card = document.createElement('div');
+                card.className = `card npc-card ${n.isTravelling ? 'travelling' : ''} ${n.hometown === focus ? 'hometown-focus' : ''}`;
+                const isOwner = state.currentUser === n.createdBy || state.isDM;
+                card.innerHTML = `
+                    <div class="card-content">
+                        <div class="meta">${n.hometown || 'Unknown'} ${n.isTravelling ? '• Travelling' : ''}</div>
+                        <h3 class="title">${n.name}</h3>
+                        <div class="desc-box">${n.description}</div>
+                        ${isOwner ? `<div class="secret-box"><strong>Secret:</strong> ${n.secret}</div>` : ''}
+                        <div style="margin-top:10px; display:flex; gap:5px;">
+                            <button class="btn-init" onclick="addToInit('${n.name}')">⚔️ Roll</button>
+                            ${isOwner ? `<button class="meta" style="background:#444; color:white;" onclick="openNPCModal('${n.id}')">Edit</button>` : ''}
+                        </div>
+                    </div>
+                `;
+                grid.appendChild(card);
+            });
+            updateHometownList();
+        }
+
+        // --- INITIATIVE LOGIC ---
+        function toggleInitiative() { state.showInitiative = !state.showInitiative; renderAll(); }
+        function addToInit(name) {
+            const score = prompt(`Enter initiative for ${name}:`, "10");
+            if (score !== null) {
+                state.initiativeOrder.push({ name, score: parseInt(score) });
+                renderAll();
+            }
+        }
+        function nextTurn() { state.initIndex = (state.initIndex + 1) % state.initiativeOrder.length; renderAll(); }
+        function prevTurn() { state.initIndex = (state.initIndex - 1 + state.initiativeOrder.length) % state.initiativeOrder.length; renderAll(); }
+        function clearInit() { if(confirm("Clear combat?")) { state.initiativeOrder = []; state.initIndex = 0; renderAll(); }}
+        function removeFromInit(i) { state.initiativeOrder.splice(i, 1); renderAll(); }
+
+        // --- CAMPAIGN LOGIC ---
+        function performLongRest() {
+            if(!confirm("Long Rest? Progresses Revived penalty and clears basic status.")) return;
+            state.pcs.forEach(pc => {
+                pc.statuses = pc.statuses.map(s => {
+                    if (s === "Revived -3") return "Revived -2";
+                    if (s === "Revived -2") return "Revived -1";
+                    if (s === "Revived -1") return null;
+                    return ["Dead", "Unconscious", "Petrified"].includes(s) ? s : null;
+                }).filter(s => s);
+            });
+            save(); renderAll();
+        }
+
+        function exportSessionLog() {
+            let log = `SESSION LOG: ${new Date().toLocaleDateString()}\n\nPARTY:\n`;
+            state.pcs.forEach(p => log += `${p.character.padEnd(12)}: [${p.statuses.join(', ')}] ${p.description}\n`);
+            log += `\nTRAVELING NPCs:\n`;
+            state.npcs.filter(n => n.isTravelling).forEach(n => log += `- ${n.name}: ${n.description}\n`);
+            const blob = new Blob([log], {type: 'text/plain'});
+            const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'Log.txt'; a.click();
+        }
+
+        function saveEntry() {
+            const m = document.getElementById('edit-modal');
+            const id = m.dataset.id;
+            if (m.dataset.type === 'npc') {
+                const data = { id: id || Date.now().toString(), name: document.getElementById('f-name').value, hometown: document.getElementById('f-town').value, description: document.getElementById('f-desc').value, secret: document.getElementById('f-sec').value, isTravelling: document.getElementById('f-tr').checked, createdBy: id ? state.npcs.find(n => n.id === id).createdBy : (state.currentUser || 'DM') };
+                if (id) state.npcs[state.npcs.findIndex(n => n.id === id)] = data; else state.npcs.push(data);
+            } else {
+                const pc = state.pcs.find(p => p.id === id);
+                pc.description = document.getElementById('f-desc').value; pc.secret = document.getElementById('f-sec').value;
+                pc.statuses = Array.from(document.querySelectorAll('.status-opt:checked')).map(el => el.value);
+            }
+            save(); renderAll(); closeModal();
+        }
+
+        function openNPCModal(id = null) {
+            const n = state.npcs.find(x => x.id === id) || { name: '', hometown: '', description: '', secret: '', isTravelling: false };
+            document.getElementById('modal-fields').innerHTML = `<input id="f-name" placeholder="Name" value="${n.name}"><input id="f-town" placeholder="Hometown" value="${n.hometown}"><textarea id="f-desc" placeholder="Public Description">${n.description}</textarea><textarea id="f-sec" placeholder="Secret">${n.secret}</textarea><label><input type="checkbox" id="f-tr" ${n.isTravelling ? 'checked' : ''}> Travelling</label>`;
+            document.getElementById('edit-modal').dataset.type = 'npc'; document.getElementById('edit-modal').dataset.id = id;
+            document.getElementById('edit-modal').style.display = 'flex';
+        }
+
+        function openPCModal(id) {
+            const pc = state.pcs.find(p => p.id === id);
+            document.getElementById('modal-fields').innerHTML = `<textarea id="f-desc">${pc.description}</textarea><textarea id="f-sec">${pc.secret}</textarea><div style="margin-top:10px;">${STATUS_OPTIONS.map(s => `<label style="font-size:11px; display:inline-block; width:45%;"><input type="checkbox" class="status-opt" value="${s}" ${pc.statuses.includes(s) ? 'checked' : ''}> ${s}</label>`).join('')}</div>`;
+            document.getElementById('edit-modal').dataset.type = 'pc'; document.getElementById('edit-modal').dataset.id = id;
+            document.getElementById('edit-modal').style.display = 'flex';
+        }
+
+        function handleLogin() {
+            const user = prompt("Name (or 'DM'):");
+            if(user) { state.currentUser = user; state.isDM = user.toLowerCase() === 'dm'; localStorage.setItem('user', user); localStorage.setItem('isDM', state.isDM); renderAll(); }
+        }
+
+        function updateHometownList() {
+            const sel = document.getElementById('hometown-focus');
+            const val = sel.value;
+            const towns = [...new Set(state.npcs.map(n => n.hometown).filter(t => t))];
+            sel.innerHTML = '<option value="">Hometown Focus...</option>' + towns.map(t => `<option value="${t}" ${t === val ? 'selected' : ''}>${t}</option>`).join('');
+        }
+
+        function save() { localStorage.setItem('npcs', JSON.stringify(state.npcs)); localStorage.setItem('pcs', JSON.stringify(state.pcs)); }
+        function closeModal() { document.getElementById('edit-modal').style.display = 'none'; }
+
+        if (state.currentUser) document.getElementById('login-btn').innerText = `User: ${state.currentUser}`;
+        renderAll();
+    </script>
+</body>
+</html>
