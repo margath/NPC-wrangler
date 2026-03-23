@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>NPC & PC Tracker - Version 1.0</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     
     <style>
         /* Base styles */
@@ -47,10 +48,12 @@
         
         button.add-btn { background: #2ecc71; color: #111; }
         button.dm-btn { background: #9b59b6; color: white; }
+        button.setup-btn { background: #8e44ad; color: white; }
         button.combat-btn { background: #e74c3c; color: white; }
         button.combat-btn.active { background: #c0392b; border: 2px solid #fff; }
         button.rest-btn { background: #3498db; color: white; }
         button.cloud-btn { background: #2c3e50; color: white; border: 1px solid #555; }
+        button.cloud-btn.pull { background: #1abc9c; border: none; }
         button.login-btn { background: #f39c12; color: #111; }
         
         /* Initiative */
@@ -59,33 +62,30 @@
         
         /* Modals */
         .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 1000; display: none; justify-content: center; align-items: center; }
-        .modal-box { background: #2a2a35; padding: 25px; border-radius: 8px; width: 90%; max-width: 500px; max-height: 90vh; overflow-y: auto; }
-
-        /* Header Layout Specifics */
-        .header-left { display: flex; align-items: center; gap: 15px; }
-        .qr-container { background: white; padding: 4px; border-radius: 4px; cursor: pointer; transition: transform 0.2s; display: flex; }
-        .qr-container:hover { transform: scale(1.05); }
+        .modal-box { background: #2a2a35; padding: 25px; border-radius: 8px; width: 90%; max-width: 600px; max-height: 90vh; overflow-y: auto; position: relative; }
+        
+        /* Setup Instructions Specifics */
+        .instructions-box { background: #1a1a20; padding: 15px; border-radius: 6px; border: 1px solid #444; font-size: 13px; line-height: 1.5; margin: 15px 0; color: #bdc3c7; max-height: 250px; overflow-y: auto; }
+        .instructions-box h3 { color: #f1c40f; margin-top: 0; }
+        .error-text { color: #e74c3c; font-weight: bold; margin-bottom: 15px; display: none; background: #4a1919; padding: 10px; border-radius: 4px; border: 1px solid #e74c3c; }
     </style>
 </head>
 <body>
 
     <header>
-        <div class="header-left">
-            <a href="https://tools.gameportal.win/" target="_blank" title="Go to Game Portal" class="qr-container">
-                <img src="https://api.qrserver.com/v1/create-qr-code/?size=90x90&data=https://tools.gameportal.win/&margin=0" alt="Game Portal QR" width="45" height="45" style="display: block;">
-            </a>
-            <h1 style="margin: 0; font-size: 24px;">👤 NPC Tracker <span style="font-size: 12px; color: #888;">v1.0</span></h1>
-        </div>
+        <h1 style="margin: 0; font-size: 24px;">👤 NPC Tracker <span style="font-size: 12px; color: #888;">v1.0</span></h1>
         <div class="controls">
             <select id="hometown-filter" onchange="renderAll()">
                 <option value="">Sort by Hometown...</option>
             </select>
             <button class="combat-btn" id="combat-toggle-btn" onclick="toggleCombat()">⚔️ Toggle Combat</button>
             <button class="rest-btn" onclick="triggerLongRest()">🏕️ Long Rest</button>
-            <button class="cloud-btn" onclick="syncToCloud()">☁️ Cloud Save</button>
-            <button class="dm-btn" onclick="exportSessionLog()">📋 Copy Session Log</button>
+            <button class="cloud-btn pull" onclick="pullFromCloud()">☁️ Pull Data</button>
+            <button class="cloud-btn" onclick="syncToCloud()">☁️ Save to Cloud</button>
+            <button class="dm-btn" onclick="exportSessionLog()">📋 Copy Log</button>
             <button class="add-btn" onclick="openAddModal()">+ New PC/NPC</button>
             <button class="login-btn" id="login-btn" onclick="openLoginModal()">Login</button>
+            <button class="setup-btn" onclick="openSetupModal()">⚙️ Setup / Share</button>
         </div>
     </header>
 
@@ -136,14 +136,70 @@
         </div>
     </div>
 
+    <div id="setup-modal" class="modal-overlay">
+        <div class="modal-box">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                <h2 style="margin: 0; color: #3498db;">🔌 Database Setup & Share</h2>
+                <button onclick="closeModal('setup-modal')" style="background: none; border: none; color: #aaa; font-size: 28px; cursor: pointer; line-height: 1;">&times;</button>
+            </div>
+            
+            <div id="setup-error-msg" class="error-text"></div>
+            
+            <div style="display: flex; gap: 20px; align-items: flex-start;">
+                <div style="flex: 1;">
+                    <p style="font-size: 14px; margin-top: 0;">Provide your Google Apps Script Web App URL to sync data for this session. This URL is temporarily saved in your browser and wiped when closed.</p>
+                    <input type="text" id="setup-gas-url" placeholder="https://script.google.com/macros/s/.../exec">
+                    <button onclick="applyGasUrl()" class="add-btn" style="width: 100%; margin-top: 10px; height: 40px;">Connect & Load Database</button>
+                </div>
+                
+                <div id="qr-section" style="display: none; text-align: center; background: #1a1a20; padding: 15px; border-radius: 6px; border: 1px solid #444;">
+                    <div id="qrcode" style="background: white; padding: 5px; display: inline-block; margin-bottom: 5px; border-radius: 4px;"></div>
+                    <div style="font-size: 11px; color: #bdc3c7; font-weight: bold; text-transform: uppercase;">Scan to Join</div>
+                </div>
+            </div>
+
+            <div class="instructions-box">
+                <h3>🛠️ Setup Instructions for the DM</h3>
+                <p>To use this tracker, you need to link it to a Google Sheet using Google Apps Script.</p>
+                <ol>
+                    <li><strong>Set Up the Google Sheet:</strong>
+                        <ul>
+                            <li>Create a new Google Sheet.</li>
+                            <li>Add two tabs at the bottom. Name the first one <strong>NPCs</strong> and the second one <strong>PCs</strong>.</li>
+                            <li>In the <strong>PCs</strong> sheet, you can manually type <code>PlayerName</code> and <code>PIN</code> as column headers to create player logins.</li>
+                        </ul>
+                    </li>
+                    <li><strong>Add the Code:</strong>
+                        <ul>
+                            <li>Click <strong>Extensions &gt; Apps Script</strong>.</li>
+                            <li>Paste the provided <code>doGet</code> and <code>doPost</code> database script.</li>
+                            <li>Click the <strong>Save</strong> icon.</li>
+                        </ul>
+                    </li>
+                    <li><strong>Deploy the Web App:</strong>
+                        <ul>
+                            <li>In the top right corner, click <strong>Deploy &gt; New deployment</strong>.</li>
+                            <li>Click the gear icon ⚙️ next to "Select type" and choose <strong>Web app</strong>.</li>
+                            <li>Under "Execute as", select <strong>Me</strong>.</li>
+                            <li>Under "Who has access", select <strong>Anyone</strong>.</li>
+                            <li>Click <strong>Deploy</strong> and authorize permissions.</li>
+                        </ul>
+                    </li>
+                    <li><strong>Link the App:</strong>
+                        <ul>
+                            <li>Copy the <strong>Web app URL</strong> provided by Google.</li>
+                            <li>Paste it into the input box above!</li>
+                        </ul>
+                    </li>
+                </ol>
+            </div>
+            <button onclick="closeModal('setup-modal')" style="width: 100%; background:#555; color:white; padding: 8px; border:none; border-radius: 4px; cursor: pointer;">Work Offline (Local Storage Only)</button>
+        </div>
+    </div>
+
     <script>
         // --- CONSTANTS & DATA ---
-        // 1. Google Apps Script Web App URL for Player Logins
-        // Make sure the GAS Web App is deployed as "Anyone" and returns JSON
-        const GAS_WEB_APP_URL = ""; 
-        
-        // 2. Cloud Save API Endpoint
-        const CLOUD_API_ENDPOINT = ""; 
+        let GAS_WEB_APP_URL = null; 
         
         const HOMETOWNS = ["Solomani Rim", "Terra", "Vanejen", "Spinward Marches", "Waterdeep", "Neverwinter", "Baldur's Gate"];
         const STATUSES = [
@@ -163,11 +219,22 @@
             playersFromSheet: [] 
         };
 
-        // --- INIT & DATABASE VALIDATION ---
+        // --- INIT & SETUP LOGIC ---
         function init() {
-            checkDatabaseVersion();
+            // 1. Check URL Parameters for GAS Link (from player scanning QR)
+            const urlParams = new URLSearchParams(window.location.search);
+            const gasParam = urlParams.get('gas');
             
-            // Setup Hometown Filter
+            if (gasParam) {
+                sessionStorage.setItem('GAS_WEB_APP_URL', gasParam);
+                // Clean the URL to look nice
+                window.history.replaceState({}, document.title, window.location.pathname);
+            }
+
+            // 2. Load URL from Session Storage
+            GAS_WEB_APP_URL = sessionStorage.getItem('GAS_WEB_APP_URL');
+
+            // 3. Setup UI Filters & Statuses
             const filter = document.getElementById('hometown-filter');
             HOMETOWNS.forEach(h => {
                 const opt = document.createElement('option');
@@ -175,16 +242,78 @@
                 filter.appendChild(opt);
             });
 
-            // Setup Status Checkboxes
             const statusGrid = document.getElementById('status-grid');
             STATUSES.forEach(s => {
                 statusGrid.innerHTML += `<label><input type="checkbox" value="${s}" class="status-cb"> ${s}</label>`;
             });
 
-            fetchPlayersFromSheet();
+            checkDatabaseVersion();
+
+            // 4. Determine Initialization Route
+            if (GAS_WEB_APP_URL) {
+                fetchCloudData(false); // Validates and loads silently
+            } else {
+                openSetupModal();
+            }
+
             renderAll();
         }
 
+        function openSetupModal() {
+            document.getElementById('setup-modal').style.display = 'flex';
+            document.getElementById('setup-error-msg').style.display = 'none';
+            document.getElementById('setup-gas-url').value = GAS_WEB_APP_URL || '';
+            
+            if (GAS_WEB_APP_URL) {
+                document.getElementById('qr-section').style.display = 'block';
+                generateQRCode();
+            } else {
+                document.getElementById('qr-section').style.display = 'none';
+            }
+        }
+
+        function showSetupModalWithError(errorMsg = null) {
+            openSetupModal();
+            const errorBox = document.getElementById('setup-error-msg');
+            if (errorMsg) {
+                errorBox.innerHTML = `⚠️ Database Mismatch/Error: <br><span style="font-weight:normal; font-size: 12px;">${errorMsg}</span>`;
+                errorBox.style.display = 'block';
+            }
+        }
+
+        function applyGasUrl() {
+            const url = document.getElementById('setup-gas-url').value.trim();
+            if (!url) return alert("Please enter a valid URL.");
+            
+            sessionStorage.setItem('GAS_WEB_APP_URL', url);
+            GAS_WEB_APP_URL = url;
+            
+            document.getElementById('setup-error-msg').style.display = 'none';
+            document.getElementById('qr-section').style.display = 'block';
+            generateQRCode();
+            
+            fetchCloudData(true); // Attempt to pull and validate immediately
+        }
+
+        function generateQRCode() {
+            const qrContainer = document.getElementById("qrcode");
+            qrContainer.innerHTML = ''; // Clear existing
+            if (!GAS_WEB_APP_URL) return;
+
+            // Generate a shareable URL that automatically populates the session storage
+            const shareableUrl = window.location.origin + window.location.pathname + "?gas=" + encodeURIComponent(GAS_WEB_APP_URL);
+            
+            new QRCode(qrContainer, {
+                text: shareableUrl,
+                width: 90,
+                height: 90,
+                colorDark : "#000000",
+                colorLight : "#ffffff",
+                correctLevel : QRCode.CorrectLevel.L
+            });
+        }
+
+        // --- LOCAL DATABASE LOGIC ---
         function checkDatabaseVersion() {
             let dbData = localStorage.getItem('dndDatabase');
             if (dbData) {
@@ -209,73 +338,103 @@
             localStorage.setItem('dndDatabase', JSON.stringify(dbData));
         }
 
-        // --- CLOUD SAVING LOGIC ---
-        async function syncToCloud() {
-            if (!CLOUD_API_ENDPOINT) {
-                alert("Cloud Sync is ready! Please paste your API URL into the CLOUD_API_ENDPOINT variable.");
-                return;
+        // --- GOOGLE APPS SCRIPT LOGIC (Cloud Sync & Logins) ---
+        async function fetchCloudData(overwriteLocal = false) {
+            if (!GAS_WEB_APP_URL) return;
+            
+            try {
+                const response = await fetch(GAS_WEB_APP_URL);
+                const data = await response.json(); 
+                
+                // VALIDATION CHECK (Mismatch detection)
+                if (data.dbType !== "NPC Database" || data.backendVersion !== "1.0") {
+                    throw new Error(`Invalid Database Signature. Expected Type: 'NPC Database', Version: '1.0'. Received Type: '${data.dbType}', Version: '${data.backendVersion}'`);
+                }
+
+                // If this was a manual connection attempt, auto-close the modal upon success
+                if (overwriteLocal) {
+                    closeModal('setup-modal');
+                }
+
+                // 1. Populate Login Dropdown
+                if (data.pcs) {
+                    state.playersFromSheet = data.pcs.filter(p => p.PlayerName);
+                    populateLoginDropdown();
+                }
+
+                // 2. Data merging logic
+                if (overwriteLocal) {
+                    const cloudPCs = (data.pcs || []).map(pc => ({...pc, isPC: true}));
+                    const cloudNPCs = (data.npcs || []).map(npc => ({...npc, isPC: false}));
+                    
+                    state.entities = [...cloudPCs, ...cloudNPCs];
+                    saveLocalDatabase();
+                    renderAll();
+                    alert("✅ Data successfully pulled and validated from Google Sheets!");
+                } else {
+                    (data.pcs || []).forEach(cloudPc => {
+                        const localPc = state.entities.find(e => e.id === cloudPc.id);
+                        if (localPc) {
+                            if (cloudPc.PlayerName) localPc.PlayerName = cloudPc.PlayerName;
+                            if (cloudPc.PIN) localPc.PIN = cloudPc.PIN;
+                        }
+                    });
+                }
+            } catch (e) {
+                console.error("Failed to fetch data from Apps Script:", e);
+                // Wipe bad URL and show warning modal with instructions
+                sessionStorage.removeItem('GAS_WEB_APP_URL');
+                GAS_WEB_APP_URL = null;
+                document.getElementById('qr-section').style.display = 'none';
+                showSetupModalWithError(e.message || "Failed to connect to the provided URL. Ensure the web app is deployed correctly.");
             }
+        }
+
+        function pullFromCloud() {
+            if (!GAS_WEB_APP_URL) return showSetupModalWithError("Please connect a database first.");
+            if (confirm("This will overwrite your local changes with the data in Google Sheets. Proceed?")) {
+                fetchCloudData(true);
+            }
+        }
+
+        async function syncToCloud() {
+            if (!GAS_WEB_APP_URL) return showSetupModalWithError("Please connect a database first.");
+
+            const pcsArray = state.entities.filter(e => e.isPC);
+            const npcsArray = state.entities.filter(e => !e.isPC);
 
             const payload = {
-                type: 'NPC Database',
-                version: '1.0',
-                entities: state.entities,
-                lastUpdated: new Date().toISOString()
+                action: 'saveData',
+                pcs: pcsArray,
+                npcs: npcsArray
             };
 
             try {
-                const response = await fetch(CLOUD_API_ENDPOINT, {
+                const response = await fetch(GAS_WEB_APP_URL, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
                     body: JSON.stringify(payload)
                 });
 
-                if (response.ok) {
-                    alert("✅ Successfully synced to the cloud!");
+                const result = await response.json();
+                if (result.status === "success") {
+                    alert("✅ Successfully saved to Google Sheets!");
                 } else {
-                    console.error("Cloud Error:", await response.text());
-                    alert("❌ Cloud sync failed. Check browser console for details.");
+                    console.error("Cloud Error:", result.error);
+                    alert("❌ Cloud sync failed. Error: " + result.error);
                 }
             } catch (error) {
                 console.error("Network/Fetch Error:", error);
-                alert("❌ Network error during cloud sync.");
+                alert("❌ Network error during cloud sync. See console.");
             }
         }
 
-        // --- GOOGLE APPS SCRIPT LOGIN LOGIC ---
-        async function fetchPlayersFromSheet() {
-            if (!GAS_WEB_APP_URL) {
-                // Fallback dummy data if no URL provided
-                state.playersFromSheet = [
-                    { PlayerName: "Alice", PIN: "1234", CharacterName: "Lyra" },
-                    { PlayerName: "Bob", PIN: "5678", CharacterName: "Grog" }
-                ];
-                populateLoginDropdown();
-                return;
-            }
-            try {
-                const response = await fetch(GAS_WEB_APP_URL);
-                const data = await response.json(); // Direct JSON parsing
-                
-                // Assuming GAS returns an array of objects like: [{PlayerName: "Alice", PIN: "123", CharacterName: "Lyra"}]
-                if (Array.isArray(data)) {
-                    state.playersFromSheet = data.filter(p => p.PlayerName); 
-                } else if (data.data && Array.isArray(data.data)) {
-                    // Fallback just in case your GAS wraps the array in a "data" property
-                    state.playersFromSheet = data.data.filter(p => p.PlayerName);
-                }
-
-                populateLoginDropdown();
-            } catch (e) {
-                console.error("Failed to fetch player sheet from Apps Script:", e);
-            }
-        }
-
+        // --- LOGIN LOGIC ---
         function populateLoginDropdown() {
             const select = document.getElementById('login-player-select');
             select.innerHTML = '<option value="">Select Player...</option>';
             state.playersFromSheet.forEach(p => {
-                select.innerHTML += `<option value="${p.PlayerName}">${p.PlayerName} (${p.CharacterName})</option>`;
+                select.innerHTML += `<option value="${p.PlayerName}">${p.PlayerName} (${p.name || p.CharacterName || 'Unknown'})</option>`;
             });
         }
 
@@ -290,11 +449,10 @@
             
             if (!playerName) return alert("Select a player!");
             
-            // Ensure both are strings for exact comparison
             const playerRec = state.playersFromSheet.find(p => p.PlayerName === playerName);
             if (playerRec && String(playerRec.PIN) === String(pin)) {
                 state.currentUser = playerRec.PlayerName;
-                state.currentCharacter = playerRec.CharacterName;
+                state.currentCharacter = playerRec.name || playerRec.CharacterName;
                 state.isDM = false;
                 updateLoginUI();
                 closeModal('login-modal');
@@ -485,7 +643,10 @@
             const id = document.getElementById('npc-modal').dataset.editId || Date.now().toString();
             const activeStatuses = Array.from(document.querySelectorAll('.status-cb:checked')).map(cb => cb.value);
 
+            const existingEnt = state.entities.find(e => e.id === id) || {};
+
             const ent = {
+                ...existingEnt, 
                 id,
                 isPC: document.getElementById('f-isPC').checked,
                 name: document.getElementById('f-name').value,
@@ -495,13 +656,12 @@
                 secret: document.getElementById('f-secret').value,
                 isTravelling: document.getElementById('f-travelling').checked,
                 statuses: activeStatuses,
-                initiative: 0,
-                createdBy: state.entities.find(e => e.id === id)?.createdBy || (state.currentUser || "DM")
+                initiative: existingEnt.initiative || 0,
+                createdBy: existingEnt.createdBy || (state.currentUser || "DM")
             };
 
             const idx = state.entities.findIndex(n => n.id === id);
             if(idx > -1) {
-                ent.initiative = state.entities[idx].initiative;
                 state.entities[idx] = ent;
             } else {
                 state.entities.push(ent);
