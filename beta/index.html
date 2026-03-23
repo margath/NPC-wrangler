@@ -5,10 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>NPC & PC Tracker - Version 1.0</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+    
     <style>
         /* Base styles */
         body { font-family: system-ui, -apple-system, sans-serif; margin: 0; background-color: #1e1e24; color: #e0e0e0; display: flex; flex-direction: column; min-height: 100vh; }
-        header { background: #2b2b36; padding: 15px 30px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #444; flex-wrap: wrap; gap: 10px; }
+        header { background: #2b2b36; padding: 15px 30px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #444; flex-wrap: wrap; gap: 15px; }
         .grid-view { padding: 30px; display: grid; gap: 20px; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); }
         
         /* Card Styles */
@@ -39,7 +40,7 @@
         .checkbox-grid label { font-size: 12px; display: flex; align-items: center; gap: 5px; cursor: pointer; }
         .checkbox-grid input[type="checkbox"] { width: auto; margin: 0; }
 
-        /* Buttons & UI (Height matched) */
+        /* Buttons & UI */
         .controls { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
         .controls select, .controls button { height: 38px; box-sizing: border-box; margin: 0; padding: 0 15px; font-size: 14px; border-radius: 4px; border: none; font-weight: bold; cursor: pointer; transition: opacity 0.2s; display: inline-flex; align-items: center; justify-content: center; }
         .controls select { width: auto; background: #1a1a20; border: 1px solid #444; color: white; }
@@ -49,6 +50,7 @@
         button.combat-btn { background: #e74c3c; color: white; }
         button.combat-btn.active { background: #c0392b; border: 2px solid #fff; }
         button.rest-btn { background: #3498db; color: white; }
+        button.cloud-btn { background: #2c3e50; color: white; border: 1px solid #555; }
         button.login-btn { background: #f39c12; color: #111; }
         
         /* Initiative */
@@ -58,18 +60,29 @@
         /* Modals */
         .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 1000; display: none; justify-content: center; align-items: center; }
         .modal-box { background: #2a2a35; padding: 25px; border-radius: 8px; width: 90%; max-width: 500px; max-height: 90vh; overflow-y: auto; }
+
+        /* Header Layout Specifics */
+        .header-left { display: flex; align-items: center; gap: 15px; }
+        .qr-container { background: white; padding: 4px; border-radius: 4px; cursor: pointer; transition: transform 0.2s; display: flex; }
+        .qr-container:hover { transform: scale(1.05); }
     </style>
 </head>
 <body>
 
     <header>
-        <h1 style="margin: 0; font-size: 24px;">👤 NPC Tracker <span style="font-size: 12px; color: #888;">v1.0</span></h1>
+        <div class="header-left">
+            <a href="https://tools.gameportal.win/" target="_blank" title="Go to Game Portal" class="qr-container">
+                <img src="https://api.qrserver.com/v1/create-qr-code/?size=90x90&data=https://tools.gameportal.win/&margin=0" alt="Game Portal QR" width="45" height="45" style="display: block;">
+            </a>
+            <h1 style="margin: 0; font-size: 24px;">👤 NPC Tracker <span style="font-size: 12px; color: #888;">v1.0</span></h1>
+        </div>
         <div class="controls">
             <select id="hometown-filter" onchange="renderAll()">
                 <option value="">Sort by Hometown...</option>
             </select>
             <button class="combat-btn" id="combat-toggle-btn" onclick="toggleCombat()">⚔️ Toggle Combat</button>
             <button class="rest-btn" onclick="triggerLongRest()">🏕️ Long Rest</button>
+            <button class="cloud-btn" onclick="syncToCloud()">☁️ Cloud Save</button>
             <button class="dm-btn" onclick="exportSessionLog()">📋 Copy Session Log</button>
             <button class="add-btn" onclick="openAddModal()">+ New PC/NPC</button>
             <button class="login-btn" id="login-btn" onclick="openLoginModal()">Login</button>
@@ -125,9 +138,13 @@
 
     <script>
         // --- CONSTANTS & DATA ---
-        // Replace this URL with your published Google Sheet CSV export link if you have one.
-        // Columns needed: PlayerName, PIN, CharacterName
-        const SHEET_CSV_URL = ""; 
+        // 1. Google Apps Script Web App URL for Player Logins
+        // Make sure the GAS Web App is deployed as "Anyone" and returns JSON
+        const GAS_WEB_APP_URL = ""; 
+        
+        // 2. Cloud Save API Endpoint
+        const CLOUD_API_ENDPOINT = ""; 
+        
         const HOMETOWNS = ["Solomani Rim", "Terra", "Vanejen", "Spinward Marches", "Waterdeep", "Neverwinter", "Baldur's Gate"];
         const STATUSES = [
             "Blinded", "Charmed", "Deafened", "Frightened", "Grappled", 
@@ -139,11 +156,11 @@
         // --- STATE MANAGEMENT ---
         const state = {
             entities: [],
-            currentUser: null, // "DM" or Player Name
-            currentCharacter: null, // Tied to spreadsheet
+            currentUser: null, 
+            currentCharacter: null, 
             isDM: false,
             combatMode: false,
-            playersFromSheet: [] // Cached player list
+            playersFromSheet: [] 
         };
 
         // --- INIT & DATABASE VALIDATION ---
@@ -179,12 +196,11 @@
                     }
                 } catch (e) { console.error("Database parse error", e); }
             }
-            // If missing or wrong version, initialize empty DB
             state.entities = [];
-            saveDatabase();
+            saveLocalDatabase();
         }
 
-        function saveDatabase() {
+        function saveLocalDatabase() {
             const dbData = {
                 type: 'NPC Database',
                 version: '1.0',
@@ -193,10 +209,43 @@
             localStorage.setItem('dndDatabase', JSON.stringify(dbData));
         }
 
-        // --- GOOGLE SHEET LOGIN LOGIC ---
+        // --- CLOUD SAVING LOGIC ---
+        async function syncToCloud() {
+            if (!CLOUD_API_ENDPOINT) {
+                alert("Cloud Sync is ready! Please paste your API URL into the CLOUD_API_ENDPOINT variable.");
+                return;
+            }
+
+            const payload = {
+                type: 'NPC Database',
+                version: '1.0',
+                entities: state.entities,
+                lastUpdated: new Date().toISOString()
+            };
+
+            try {
+                const response = await fetch(CLOUD_API_ENDPOINT, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                if (response.ok) {
+                    alert("✅ Successfully synced to the cloud!");
+                } else {
+                    console.error("Cloud Error:", await response.text());
+                    alert("❌ Cloud sync failed. Check browser console for details.");
+                }
+            } catch (error) {
+                console.error("Network/Fetch Error:", error);
+                alert("❌ Network error during cloud sync.");
+            }
+        }
+
+        // --- GOOGLE APPS SCRIPT LOGIN LOGIC ---
         async function fetchPlayersFromSheet() {
-            if (!SHEET_CSV_URL) {
-                // Fallback dummy data if no spreadsheet provided
+            if (!GAS_WEB_APP_URL) {
+                // Fallback dummy data if no URL provided
                 state.playersFromSheet = [
                     { PlayerName: "Alice", PIN: "1234", CharacterName: "Lyra" },
                     { PlayerName: "Bob", PIN: "5678", CharacterName: "Grog" }
@@ -205,21 +254,20 @@
                 return;
             }
             try {
-                const response = await fetch(SHEET_CSV_URL);
-                const csvText = await response.text();
-                // Simple CSV parse (assumes no commas inside quotes)
-                const rows = csvText.split('\n').map(r => r.split(','));
-                const headers = rows[0].map(h => h.trim());
+                const response = await fetch(GAS_WEB_APP_URL);
+                const data = await response.json(); // Direct JSON parsing
                 
-                state.playersFromSheet = rows.slice(1).map(row => {
-                    let obj = {};
-                    row.forEach((val, i) => obj[headers[i]] = val ? val.trim() : '');
-                    return obj;
-                }).filter(p => p.PlayerName); // Filter out empties
+                // Assuming GAS returns an array of objects like: [{PlayerName: "Alice", PIN: "123", CharacterName: "Lyra"}]
+                if (Array.isArray(data)) {
+                    state.playersFromSheet = data.filter(p => p.PlayerName); 
+                } else if (data.data && Array.isArray(data.data)) {
+                    // Fallback just in case your GAS wraps the array in a "data" property
+                    state.playersFromSheet = data.data.filter(p => p.PlayerName);
+                }
 
                 populateLoginDropdown();
             } catch (e) {
-                console.error("Failed to fetch player sheet:", e);
+                console.error("Failed to fetch player sheet from Apps Script:", e);
             }
         }
 
@@ -242,8 +290,9 @@
             
             if (!playerName) return alert("Select a player!");
             
+            // Ensure both are strings for exact comparison
             const playerRec = state.playersFromSheet.find(p => p.PlayerName === playerName);
-            if (playerRec && playerRec.PIN === pin) {
+            if (playerRec && String(playerRec.PIN) === String(pin)) {
                 state.currentUser = playerRec.PlayerName;
                 state.currentCharacter = playerRec.CharacterName;
                 state.isDM = false;
@@ -282,24 +331,19 @@
             const selectedHometown = document.getElementById('hometown-filter').value;
             grid.innerHTML = '';
 
-            // 1. Calculate Priority and Sort
             const displayList = [...state.entities].sort((a, b) => {
-                // If combat mode, sort strictly by Initiative
                 if (state.combatMode) {
                     return (b.initiative || 0) - (a.initiative || 0);
                 }
-                
-                // Normal Sorting
                 const getPriority = (ent) => {
-                    if (ent.isTravelling) return 4; // Ultimate (Party/Travelling)
-                    if (ent.isPC) return 3; // PCs slightly higher than normal NPCs
-                    if (ent.hometown === selectedHometown) return 2; // Penultimate (Hometown)
-                    return 1; // Standard
+                    if (ent.isTravelling) return 4; 
+                    if (ent.isPC) return 3; 
+                    if (ent.hometown === selectedHometown) return 2; 
+                    return 1; 
                 };
                 return getPriority(b) - getPriority(a) || a.name.localeCompare(b.name);
             });
 
-            // 2. Build Cards
             displayList.forEach(ent => {
                 const isOwner = (state.currentUser === ent.createdBy) || (state.currentCharacter && ent.name === state.currentCharacter);
                 const canSeeSecret = state.isDM || isOwner;
@@ -314,7 +358,6 @@
                 const card = document.createElement('div');
                 card.className = classes.join(' ');
                 
-                // Status Pills
                 let statusHTML = '';
                 if (ent.statuses && ent.statuses.length > 0) {
                     statusHTML = `<div class="status-container">` + 
@@ -324,7 +367,6 @@
                         }).join('') + `</div>`;
                 }
 
-                // Initiative Box (Only in Combat Mode)
                 let initBoxHTML = '';
                 if (state.combatMode) {
                     const disabled = state.isDM || isOwner ? '' : 'disabled';
@@ -372,9 +414,8 @@
             } else {
                 btn.classList.remove('active');
                 btn.innerText = "⚔️ Toggle Combat";
-                // Clear initiative on end combat
                 state.entities.forEach(e => e.initiative = 0);
-                saveDatabase();
+                saveLocalDatabase();
             }
             renderAll();
         }
@@ -383,8 +424,8 @@
             const ent = state.entities.find(e => e.id === id);
             if (ent) {
                 ent.initiative = parseInt(val) || 0;
-                saveDatabase();
-                renderAll(); // Re-sort
+                saveLocalDatabase();
+                renderAll(); 
             }
         }
 
@@ -396,10 +437,8 @@
             state.entities.forEach(ent => {
                 if (!ent.statuses) ent.statuses = [];
                 
-                // Clear temps
                 ent.statuses = ent.statuses.filter(s => !tempStatuses.includes(s));
                 
-                // Progress Revived
                 if (ent.statuses.includes("Revived -3")) {
                     ent.statuses = ent.statuses.filter(s => s !== "Revived -3");
                     ent.statuses.push("Revived -2");
@@ -411,7 +450,7 @@
                 }
             });
             
-            saveDatabase();
+            saveLocalDatabase();
             renderAll();
             alert("Long Rest completed. Statuses updated.");
         }
@@ -433,7 +472,6 @@
             document.getElementById('f-secret').value = ent.secret || '';
             document.getElementById('f-travelling').checked = ent.isTravelling;
             
-            // Check statuses
             document.querySelectorAll('.status-cb').forEach(cb => {
                 cb.checked = ent.statuses && ent.statuses.includes(cb.value);
             });
@@ -445,8 +483,6 @@
 
         function saveEntity() {
             const id = document.getElementById('npc-modal').dataset.editId || Date.now().toString();
-            
-            // Gather Statuses
             const activeStatuses = Array.from(document.querySelectorAll('.status-cb:checked')).map(cb => cb.value);
 
             const ent = {
@@ -465,14 +501,13 @@
 
             const idx = state.entities.findIndex(n => n.id === id);
             if(idx > -1) {
-                // Preserve initiative if editing during combat
                 ent.initiative = state.entities[idx].initiative;
                 state.entities[idx] = ent;
             } else {
                 state.entities.push(ent);
             }
 
-            saveDatabase();
+            saveLocalDatabase();
             closeModal('npc-modal');
             renderAll();
         }
@@ -494,7 +529,6 @@
                 log += `- ${n.name}${tagStr}: ${n.description}\n`;
             });
 
-            // Copy to Keyboard/Clipboard
             navigator.clipboard.writeText(log).then(() => {
                 alert("Session log copied to your clipboard successfully!");
             }).catch(err => {
@@ -504,9 +538,7 @@
         }
 
         // --- UTILS ---
-        function closeModal(id) { 
-            document.getElementById(id).style.display = 'none'; 
-        }
+        function closeModal(id) { document.getElementById(id).style.display = 'none'; }
         
         function resetForm() {
             document.getElementById('f-isPC').checked = false;
