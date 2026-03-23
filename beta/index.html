@@ -11,7 +11,10 @@
         /* Base styles */
         body { font-family: system-ui, -apple-system, sans-serif; margin: 0; background-color: #1e1e24; color: #e0e0e0; display: flex; flex-direction: column; min-height: 100vh; }
         header { background: #2b2b36; padding: 15px 30px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #444; flex-wrap: wrap; gap: 15px; }
+        
+        /* Layout Containers */
         .grid-view { padding: 30px; display: grid; gap: 20px; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); }
+        .table-container { padding: 30px; overflow-x: auto; }
         
         /* Card Styles */
         .npc-card { background: #2a2a35; border-radius: 10px; border: 1px solid #444; position: relative; display: flex; flex-direction: column; overflow: hidden; transition: transform 0.2s; }
@@ -27,12 +30,20 @@
         .description-box { background: #1a1a20; padding: 10px; border-radius: 4px; font-size: 13px; margin: 10px 0; border: 1px solid #333; min-height: 40px; }
         .secret-box { background: #2d1b2d; border: 1px solid #9b59b6; color: #d192e8; padding: 10px; border-radius: 4px; font-size: 13px; font-style: italic; margin-bottom: 10px; }
         
+        /* Table Styles */
+        .table-view { width: 100%; border-collapse: collapse; background: #2a2a35; border-radius: 8px; overflow: hidden; font-size: 14px; }
+        .table-view th, .table-view td { padding: 12px 15px; border-bottom: 1px solid #444; text-align: left; vertical-align: top; }
+        .table-view th { background: #1a1a20; color: #3498db; text-transform: uppercase; font-size: 12px; font-weight: bold; }
+        .table-view tr:last-child td { border-bottom: none; }
+        .table-view tr:hover { background: #333340; }
+        .table-view tr.dead { opacity: 0.6; filter: grayscale(0.8); }
+
         /* Badges & Statuses */
         .badge { padding: 2px 6px; border-radius: 4px; font-size: 10px; margin-left: 5px; vertical-align: middle; font-weight: bold; color: #000; }
         .badge-pc { background: #f1c40f; }
         .badge-travelling { background: #2ecc71; }
         .status-container { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 10px; }
-        .status-pill { background: #e74c3c; color: white; padding: 3px 8px; border-radius: 12px; font-size: 11px; font-weight: bold; }
+        .status-pill { background: #e74c3c; color: white; padding: 3px 8px; border-radius: 12px; font-size: 11px; font-weight: bold; white-space: nowrap; }
         .status-pill.revived { background: #e67e22; }
         
         /* Forms & Inputs */
@@ -55,7 +66,11 @@
         button.rest-btn { background: #3498db; color: white; }
         button.cloud-btn { background: #2c3e50; color: white; border: 1px solid #555; }
         button.cloud-btn.pull { background: #1abc9c; border: none; }
+        button.view-btn { background: #45b7d1; color: #111; }
+        
+        /* Login States */
         button.login-btn { background: #f39c12; color: #111; }
+        button.elevate-btn { background: #9b59b6; color: white; display: none; }
         button.logout-btn { background: #e74c3c; color: white; display: none; }
         
         /* Initiative */
@@ -70,24 +85,37 @@
         .instructions-box { background: #1a1a20; padding: 15px; border-radius: 6px; border: 1px solid #444; font-size: 13px; line-height: 1.5; margin: 15px 0; color: #bdc3c7; max-height: 400px; overflow-y: auto; }
         .instructions-box h3 { color: #f1c40f; margin-top: 0; }
         .error-text { color: #e74c3c; font-weight: bold; margin-bottom: 15px; display: none; background: #4a1919; padding: 10px; border-radius: 4px; border: 1px solid #e74c3c; }
+
+        /* Header Specifics */
+        .header-left { display: flex; align-items: center; gap: 15px; }
+        .qr-container { background: white; padding: 4px; border-radius: 4px; cursor: pointer; transition: transform 0.2s; display: flex; justify-content: center; align-items: center; min-width: 45px; min-height: 45px;}
+        .qr-container:hover { transform: scale(1.05); }
     </style>
 </head>
 <body>
 
     <header>
-        <h1 style="margin: 0; font-size: 24px;">👤 NPC Tracker <span style="font-size: 12px; color: #888;">v1.0</span></h1>
+        <div class="header-left">
+            <a href="https://tools.gameportal.win/" target="_blank" title="Go to Game Portal" class="qr-container">
+                <img src="https://api.qrserver.com/v1/create-qr-code/?size=90x90&data=https://tools.gameportal.win/&margin=0" alt="Game Portal QR" width="45" height="45" style="display: block;">
+            </a>
+            <h1 style="margin: 0; font-size: 24px;">👤 NPC Tracker <span style="font-size: 12px; color: #888;">v1.0</span></h1>
+        </div>
         <div class="controls">
             <select id="hometown-filter" onchange="renderAll()">
                 <option value="">Sort by Hometown...</option>
             </select>
+            <button class="view-btn" onclick="toggleView()">🗂️ Toggle View</button>
             <button class="combat-btn" id="combat-toggle-btn" onclick="toggleCombat()">⚔️ Toggle Combat</button>
             <button class="rest-btn" onclick="triggerLongRest()">🏕️ Long Rest</button>
+            
             <button class="cloud-btn pull" onclick="pullFromCloud()">☁️ Pull Data</button>
             <button class="cloud-btn" onclick="syncToCloud()">☁️ Save to Cloud</button>
-            <button class="dm-btn" onclick="exportSessionLog()">📋 Copy Log</button>
+            
             <button class="add-btn" onclick="openAddModal()">+ New PC/NPC</button>
             
             <button class="login-btn" id="login-btn" onclick="openLoginModal()">Login</button>
+            <button class="elevate-btn" id="elevate-btn" onclick="elevateToDM()">👑 Elevate DM</button>
             <button class="logout-btn" id="logout-btn" onclick="logout()">Logout</button>
             
             <button class="setup-btn" id="setup-btn" onclick="openSetupModal()">⚙️ Setup / Share</button>
@@ -129,14 +157,12 @@
     <div id="login-modal" class="modal-overlay">
         <div class="modal-box" style="max-width: 300px;">
             <h2>Player Login</h2>
-            <p style="font-size: 12px; color: #aaa;">Leave empty and click DM for Game Master access.</p>
             <select id="login-player-select">
                 <option value="">Select Player...</option>
                 </select>
             <input type="password" id="login-pin" placeholder="Enter PIN">
             <div style="display:flex; gap: 10px; margin-top: 15px;">
                 <button onclick="attemptLogin()" class="login-btn" style="flex:1;">Login</button>
-                <button onclick="loginAsDM()" class="dm-btn" style="flex:1;">DM Override</button>
             </div>
             <button onclick="closeModal('login-modal')" style="width: 100%; margin-top: 10px; background:#555; color:white; padding: 8px;">Cancel</button>
         </div>
@@ -159,7 +185,7 @@
                 </div>
                 
                 <div id="qr-section" style="display: none; text-align: center; background: #1a1a20; padding: 15px; border-radius: 6px; border: 1px solid #444;">
-                    <div id="qrcode" style="background: white; padding: 5px; display: inline-block; margin-bottom: 5px; border-radius: 4px;"></div>
+                    <div id="share-qrcode" style="background: white; padding: 5px; display: inline-block; margin-bottom: 5px; border-radius: 4px;"></div>
                     <div style="font-size: 11px; color: #bdc3c7; font-weight: bold; text-transform: uppercase;">Scan to Join</div>
                 </div>
             </div>
@@ -172,7 +198,7 @@
                         <ul>
                             <li>Create a new Google Sheet.</li>
                             <li>Add two tabs at the bottom. Name the first one <strong>NPCs</strong> and the second one <strong>PCs</strong>.</li>
-                            <li>In the <strong>PCs</strong> sheet, you can manually type <code>PlayerName</code> and <code>PIN</code> as column headers to create player logins.</li>
+                            <li>In the <strong>PCs</strong> sheet, type <code>PlayerName</code>, <code>CharacterName</code>, and <code>PIN</code> as column headers to create player logins.</li>
                         </ul>
                     </li>
                     <li style="margin-top: 10px;"><strong>Add the Code:</strong>
@@ -307,27 +333,25 @@ function doPost(e) {
             entities: [],
             currentUser: null, 
             currentCharacter: null, 
+            currentPin: null, // Verifies identity during elevation
             isDM: false,
             combatMode: false,
-            playersFromSheet: [] 
+            playersFromSheet: [],
+            viewMode: 'grid' // 'grid' or 'table'
         };
 
         // --- INIT & SETUP LOGIC ---
         function init() {
-            // 1. Check URL Parameters for GAS Link (from player scanning QR)
             const urlParams = new URLSearchParams(window.location.search);
             const gasParam = urlParams.get('gas');
             
             if (gasParam) {
                 sessionStorage.setItem('GAS_WEB_APP_URL', gasParam);
-                // Clean the URL to look nice
                 window.history.replaceState({}, document.title, window.location.pathname);
             }
 
-            // 2. Load URL from Session Storage
             GAS_WEB_APP_URL = sessionStorage.getItem('GAS_WEB_APP_URL');
 
-            // 3. Setup UI Filters & Statuses
             const filter = document.getElementById('hometown-filter');
             HOMETOWNS.forEach(h => {
                 const opt = document.createElement('option');
@@ -344,9 +368,8 @@ function doPost(e) {
             updateLoginUI();
             updateConnectionUI();
 
-            // 4. Determine Initialization Route
             if (GAS_WEB_APP_URL) {
-                fetchCloudData(false); // Validates and loads silently
+                fetchCloudData(false);
             } else {
                 openSetupModal();
             }
@@ -372,16 +395,16 @@ function doPost(e) {
             const btn = document.getElementById('disconnect-btn');
             
             if (!disconnectArmed) {
-                // First Click: Arm the disconnect with a 1 second safety delay
+                // Arm the disconnect
                 disconnectArmed = true;
                 btn.innerText = "Wait...";
                 btn.style.background = "#c0392b";
-                btn.disabled = true; // Prevent immediate double click
+                btn.disabled = true; 
                 
                 setTimeout(() => {
                     btn.innerText = "⚠️ Confirm Disconnect";
                     btn.disabled = false;
-                }, 1000); // 1 second delay before confirmation is allowed
+                }, 1000); 
                 
                 // Disarm automatically after 5 seconds if ignored
                 setTimeout(() => {
@@ -393,17 +416,15 @@ function doPost(e) {
                 }, 5000);
                 
             } else {
-                // Second Click (Confirmed)
+                // Confirmed Disconnect
                 disconnectArmed = false;
                 sessionStorage.removeItem('GAS_WEB_APP_URL');
                 GAS_WEB_APP_URL = null;
                 
-                // Update UI visually
                 btn.innerText = "🔌 Disconnect";
                 btn.style.background = "#555";
                 updateConnectionUI();
                 
-                // Clean URL just in case
                 window.history.replaceState({}, document.title, window.location.pathname);
                 alert("Disconnected from Cloud Database. Working locally.");
             }
@@ -416,7 +437,7 @@ function doPost(e) {
             
             if (GAS_WEB_APP_URL) {
                 document.getElementById('qr-section').style.display = 'block';
-                generateQRCode();
+                generateShareQRCode();
             } else {
                 document.getElementById('qr-section').style.display = 'none';
             }
@@ -426,7 +447,7 @@ function doPost(e) {
             openSetupModal();
             const errorBox = document.getElementById('setup-error-msg');
             if (errorMsg) {
-                errorBox.innerHTML = `⚠️ Database Mismatch/Error: <br><span style="font-weight:normal; font-size: 12px;">${errorMsg}</span>`;
+                errorBox.innerHTML = `⚠️ Database Error: <br><span style="font-weight:normal; font-size: 12px;">${errorMsg}</span>`;
                 errorBox.style.display = 'block';
             }
         }
@@ -440,18 +461,17 @@ function doPost(e) {
             
             document.getElementById('setup-error-msg').style.display = 'none';
             document.getElementById('qr-section').style.display = 'block';
-            generateQRCode();
+            generateShareQRCode();
             updateConnectionUI();
             
-            fetchCloudData(true); // Attempt to pull and validate immediately
+            fetchCloudData(true);
         }
 
-        function generateQRCode() {
-            const qrContainer = document.getElementById("qrcode");
-            qrContainer.innerHTML = ''; // Clear existing
+        function generateShareQRCode() {
+            const qrContainer = document.getElementById("share-qrcode");
+            qrContainer.innerHTML = ''; 
             if (!GAS_WEB_APP_URL) return;
 
-            // Generate a shareable URL that automatically populates the session storage
             const shareableUrl = window.location.origin + window.location.pathname + "?gas=" + encodeURIComponent(GAS_WEB_APP_URL);
             
             new QRCode(qrContainer, {
@@ -467,10 +487,10 @@ function doPost(e) {
         function copyGasScript() {
             const scriptText = document.getElementById('gas-script-code').value;
             navigator.clipboard.writeText(scriptText).then(() => {
-                alert("✅ Google Apps Script copied to clipboard!");
+                alert("✅ Script copied to clipboard!");
             }).catch(err => {
                 console.error("Failed to copy text: ", err);
-                alert("Failed to copy. Please manually select the text inside the box and copy it.");
+                alert("Failed to copy. Please select the text and copy manually.");
             });
         }
 
@@ -507,25 +527,20 @@ function doPost(e) {
                 const response = await fetch(GAS_WEB_APP_URL);
                 const data = await response.json(); 
                 
-                // VALIDATION CHECK (Mismatch detection)
                 if (data.dbType !== "NPC Database" || data.backendVersion !== "1.0") {
-                    throw new Error(`Invalid Database Signature. Expected Type: 'NPC Database', Version: '1.0'. Received Type: '${data.dbType}', Version: '${data.backendVersion}'`);
+                    throw new Error(`Invalid Database Signature. Expected Type: 'NPC Database', Version: '1.0'. Received Type: '${data.dbType}'`);
                 }
 
-                // If this was a manual connection attempt, auto-close the modal upon success
                 if (overwriteLocal) {
                     closeModal('setup-modal');
                 }
 
-                // 1. Populate Login Dropdown
                 if (data.pcs) {
                     state.playersFromSheet = data.pcs.filter(p => p.PlayerName);
                     populateLoginDropdown();
                 }
 
-                // 2. Data merging logic
                 if (overwriteLocal) {
-                    // Map PCs safely: if 'name' doesn't exist, fallback to 'CharacterName'
                     const cloudPCs = (data.pcs || []).map(pc => ({
                         ...pc, 
                         isPC: true,
@@ -554,13 +569,12 @@ function doPost(e) {
                     });
                 }
             } catch (e) {
-                console.error("Failed to fetch data from Apps Script:", e);
-                // Wipe bad URL and show warning modal with instructions
+                console.error("Failed to fetch data:", e);
                 sessionStorage.removeItem('GAS_WEB_APP_URL');
                 GAS_WEB_APP_URL = null;
                 updateConnectionUI();
                 document.getElementById('qr-section').style.display = 'none';
-                showSetupModalWithError(e.message || "Failed to connect to the provided URL. Ensure the web app is deployed correctly.");
+                showSetupModalWithError(e.message || "Failed to connect to the provided URL.");
             }
         }
 
@@ -599,11 +613,11 @@ function doPost(e) {
                 }
             } catch (error) {
                 console.error("Network/Fetch Error:", error);
-                alert("❌ Network error during cloud sync. See console.");
+                alert("❌ Network error during cloud sync.");
             }
         }
 
-        // --- LOGIN LOGIC ---
+        // --- AUTH & LOGIN LOGIC ---
         function populateLoginDropdown() {
             const select = document.getElementById('login-player-select');
             select.innerHTML = '<option value="">Select Player...</option>';
@@ -627,7 +641,8 @@ function doPost(e) {
             if (playerRec && String(playerRec.PIN) === String(pin)) {
                 state.currentUser = playerRec.PlayerName;
                 state.currentCharacter = playerRec.name || playerRec.CharacterName;
-                state.isDM = false;
+                state.currentPin = String(pin);
+                state.isDM = false; // Always start as player
                 updateLoginUI();
                 closeModal('login-modal');
                 renderAll();
@@ -636,18 +651,30 @@ function doPost(e) {
             }
         }
 
-        function loginAsDM() {
-            state.currentUser = "DM";
-            state.currentCharacter = null;
-            state.isDM = true;
-            updateLoginUI();
-            closeModal('login-modal');
-            renderAll();
+        function elevateToDM() {
+            if (state.isDM) {
+                // Already DM, drop status back to standard player
+                state.isDM = false;
+                updateLoginUI();
+                renderAll();
+                return;
+            }
+            
+            // Attempt Elevation
+            const enteredPin = prompt("Please enter your PIN again to verify DM elevation:");
+            if (enteredPin === state.currentPin) {
+                state.isDM = true;
+                updateLoginUI();
+                renderAll();
+            } else if (enteredPin !== null) {
+                alert("Incorrect PIN. Elevation denied.");
+            }
         }
 
         function logout() {
             state.currentUser = null;
             state.currentCharacter = null;
+            state.currentPin = null;
             state.isDM = false;
             updateLoginUI();
             renderAll();
@@ -655,23 +682,42 @@ function doPost(e) {
 
         function updateLoginUI() {
             const loginBtn = document.getElementById('login-btn');
+            const elevateBtn = document.getElementById('elevate-btn');
             const logoutBtn = document.getElementById('logout-btn');
             
-            if (state.currentUser || state.isDM) {
+            if (state.currentUser) {
                 loginBtn.style.display = 'none';
+                elevateBtn.style.display = 'inline-flex';
                 logoutBtn.style.display = 'inline-flex';
-                logoutBtn.innerText = `Logout (${state.isDM ? 'DM' : state.currentUser})`;
+                
+                logoutBtn.innerText = `Logout (${state.currentUser})`;
+                
+                if (state.isDM) {
+                    elevateBtn.innerText = "🛑 Drop DM Status";
+                    elevateBtn.style.background = "#c0392b";
+                } else {
+                    elevateBtn.innerText = "👑 Elevate DM";
+                    elevateBtn.style.background = "#9b59b6";
+                }
             } else {
                 loginBtn.style.display = 'inline-flex';
+                elevateBtn.style.display = 'none';
                 logoutBtn.style.display = 'none';
             }
         }
 
-        // --- RENDER LOGIC ---
+        // --- RENDER & VIEW LOGIC ---
+        function toggleView() {
+            state.viewMode = state.viewMode === 'grid' ? 'table' : 'grid';
+            renderAll();
+        }
+
         function renderAll() {
-            const grid = document.getElementById('npc-grid');
+            const container = document.getElementById('npc-grid');
             const selectedHometown = document.getElementById('hometown-filter').value;
-            grid.innerHTML = '';
+            container.innerHTML = '';
+            
+            container.className = state.viewMode === 'grid' ? 'grid-view' : 'table-container';
 
             const displayList = [...state.entities].sort((a, b) => {
                 if (state.combatMode) {
@@ -686,64 +732,138 @@ function doPost(e) {
                 return getPriority(b) - getPriority(a) || a.name.localeCompare(b.name);
             });
 
-            displayList.forEach(ent => {
-                const isOwner = (state.currentUser === ent.createdBy) || (state.currentCharacter && ent.name === state.currentCharacter);
-                const canSeeSecret = state.isDM || isOwner;
-                const isDead = ent.statuses && ent.statuses.includes("Dead");
-                
-                let classes = ['npc-card'];
-                if (ent.isPC) classes.push('pc');
-                if (ent.isTravelling) classes.push('travelling');
-                if (ent.hometown === selectedHometown && !state.combatMode) classes.push('hometown-focus');
-                if (isDead) classes.push('dead');
+            if (state.viewMode === 'table') {
+                let tableHTML = `
+                    <table class="table-view">
+                        <thead>
+                            <tr>
+                                <th style="min-width: 150px;">Name / Identity</th>
+                                <th>Origin</th>
+                                <th>Tags</th>
+                                ${state.combatMode ? '<th style="text-align:center;">Init</th>' : ''}
+                                <th>Statuses</th>
+                                <th style="width: 30%;">Details</th>
+                                <th style="min-width: 120px;">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                `;
 
-                const card = document.createElement('div');
-                card.className = classes.join(' ');
-                
-                let statusHTML = '';
-                if (ent.statuses && ent.statuses.length > 0) {
-                    statusHTML = `<div class="status-container">` + 
-                        ent.statuses.map(s => {
-                            let pClass = s.includes("Revived") ? 'status-pill revived' : 'status-pill';
-                            return `<span class="${pClass}">${s}</span>`;
-                        }).join('') + `</div>`;
-                }
+                displayList.forEach(ent => {
+                    const isOwner = (state.currentUser === ent.createdBy) || (state.currentCharacter && ent.name === state.currentCharacter);
+                    const canSeeSecret = state.isDM || isOwner;
+                    const isDead = ent.statuses && ent.statuses.includes("Dead");
+                    
+                    let tags = [];
+                    if (ent.isPC) tags.push('<span class="badge badge-pc">PC</span>');
+                    if (ent.isTravelling) tags.push('<span class="badge badge-travelling">PARTY</span>');
 
-                let initBoxHTML = '';
-                if (state.combatMode) {
-                    const disabled = state.isDM || isOwner ? '' : 'disabled';
-                    initBoxHTML = `
-                        <div class="init-box">
-                            <span style="font-size:12px; font-weight:bold; color:#e74c3c;">INIT:</span>
-                            <input type="number" value="${ent.initiative || 0}" 
-                                onchange="updateInitiative('${ent.id}', this.value)" ${disabled}>
+                    let statusHTML = (ent.statuses || []).map(s => {
+                        let pClass = s.includes("Revived") ? 'status-pill revived' : 'status-pill';
+                        return `<span class="${pClass}">${s}</span>`;
+                    }).join(' ');
+
+                    let initHTML = '';
+                    if (state.combatMode) {
+                        const disabled = state.isDM || isOwner ? '' : 'disabled';
+                        initHTML = `<td style="text-align:center;"><input type="number" style="width:50px; text-align:center; padding:4px;" value="${ent.initiative || 0}" onchange="updateInitiative('${ent.id}', this.value)" ${disabled}></td>`;
+                    }
+
+                    let detailsStr = `<div style="font-size:12px; margin-bottom:5px;"><strong>Desc:</strong> ${ent.description || 'N/A'}</div>`;
+                    if (canSeeSecret && ent.secret) {
+                        detailsStr += `<div style="font-size:12px; color:#d192e8;"><strong>Secret:</strong> ${ent.secret}</div>`;
+                    }
+
+                    let actionHTML = '';
+                    if (state.isDM || isOwner) {
+                        actionHTML = `
+                            <button onclick="editEntity('${ent.id}')" style="font-size:11px; background:#444; color:white; padding: 4px 8px; margin-right: 4px;">Edit</button>
+                            <button onclick="deleteEntity('${ent.id}')" style="font-size:11px; background:#c0392b; color:white; padding: 4px 8px;">Del</button>
+                        `;
+                    }
+
+                    tableHTML += `
+                        <tr class="${isDead ? 'dead' : ''}">
+                            <td>
+                                <strong>${ent.name}</strong>
+                                ${ent.tagline ? `<br><span style="font-size:11px; color:#aaa; font-style:italic;">"${ent.tagline}"</span>` : ''}
+                            </td>
+                            <td>${ent.hometown || '-'}</td>
+                            <td>${tags.join('<br>')}</td>
+                            ${initHTML}
+                            <td><div class="status-container" style="margin:0;">${statusHTML}</div></td>
+                            <td>${detailsStr}</td>
+                            <td>${actionHTML}</td>
+                        </tr>
+                    `;
+                });
+                tableHTML += `</tbody></table>`;
+                container.innerHTML = tableHTML;
+
+            } else {
+                // GRID VIEW
+                displayList.forEach(ent => {
+                    const isOwner = (state.currentUser === ent.createdBy) || (state.currentCharacter && ent.name === state.currentCharacter);
+                    const canSeeSecret = state.isDM || isOwner;
+                    const isDead = ent.statuses && ent.statuses.includes("Dead");
+                    
+                    let classes = ['npc-card'];
+                    if (ent.isPC) classes.push('pc');
+                    if (ent.isTravelling) classes.push('travelling');
+                    if (ent.hometown === selectedHometown && !state.combatMode) classes.push('hometown-focus');
+                    if (isDead) classes.push('dead');
+
+                    const card = document.createElement('div');
+                    card.className = classes.join(' ');
+                    
+                    let statusHTML = '';
+                    if (ent.statuses && ent.statuses.length > 0) {
+                        statusHTML = `<div class="status-container">` + 
+                            ent.statuses.map(s => {
+                                let pClass = s.includes("Revived") ? 'status-pill revived' : 'status-pill';
+                                return `<span class="${pClass}">${s}</span>`;
+                            }).join('') + `</div>`;
+                    }
+
+                    let initBoxHTML = '';
+                    if (state.combatMode) {
+                        const disabled = state.isDM || isOwner ? '' : 'disabled';
+                        initBoxHTML = `
+                            <div class="init-box">
+                                <span style="font-size:12px; font-weight:bold; color:#e74c3c;">INIT:</span>
+                                <input type="number" value="${ent.initiative || 0}" 
+                                    onchange="updateInitiative('${ent.id}', this.value)" ${disabled}>
+                            </div>
+                        `;
+                    }
+                    
+                    card.innerHTML = `
+                        <div class="card-content">
+                            <div class="npc-meta">
+                                ${ent.hometown || 'Unknown Origin'}
+                                ${ent.isPC ? '<span class="badge badge-pc">PC</span>' : ''}
+                                ${ent.isTravelling ? '<span class="badge badge-travelling">TRAVELLING</span>' : ''}
+                            </div>
+                            <h3 class="npc-name">${ent.name}</h3>
+                            ${ent.tagline ? `<div class="npc-tagline">"${ent.tagline}"</div>` : ''}
+                            
+                            ${statusHTML}
+                            ${initBoxHTML}
+                            
+                            <div class="description-box">${ent.description}</div>
+                            ${canSeeSecret ? `<div class="secret-box"><strong>Secret:</strong> ${ent.secret || 'None'}</div>` : ''}
+                            
+                            <div style="margin-top: 10px; display: flex; gap: 5px;">
+                                ${(state.isDM || isOwner) ? `
+                                    <button onclick="editEntity('${ent.id}')" style="font-size:11px; background:#444; color:white; padding: 5px 10px; flex: 1;">Edit Data</button>
+                                    <button onclick="deleteEntity('${ent.id}')" style="font-size:11px; background:#c0392b; color:white; padding: 5px 10px;">Delete</button>
+                                ` : ''}
+                            </div>
                         </div>
                     `;
-                }
-                
-                card.innerHTML = `
-                    <div class="card-content">
-                        <div class="npc-meta">
-                            ${ent.hometown || 'Unknown Origin'}
-                            ${ent.isPC ? '<span class="badge badge-pc">PC</span>' : ''}
-                            ${ent.isTravelling ? '<span class="badge badge-travelling">TRAVELLING</span>' : ''}
-                        </div>
-                        <h3 class="npc-name">${ent.name}</h3>
-                        ${ent.tagline ? `<div class="npc-tagline">"${ent.tagline}"</div>` : ''}
-                        
-                        ${statusHTML}
-                        ${initBoxHTML}
-                        
-                        <div class="description-box">${ent.description}</div>
-                        ${canSeeSecret ? `<div class="secret-box"><strong>Secret:</strong> ${ent.secret || 'None'}</div>` : ''}
-                        
-                        <div style="margin-top: 10px; display: flex; gap: 5px;">
-                            ${(state.isDM || isOwner) ? `<button onclick="editEntity('${ent.id}')" style="font-size:11px; background:#444; color:white; padding: 5px 10px;">Edit Data</button>` : ''}
-                        </div>
-                    </div>
-                `;
-                grid.appendChild(card);
-            });
+                    container.appendChild(card);
+                });
+            }
         }
 
         // --- GAME MECHANICS ---
@@ -797,7 +917,7 @@ function doPost(e) {
             alert("Long Rest completed. Statuses updated.");
         }
 
-        // --- ADD/EDIT LOGIC ---
+        // --- ADD/EDIT/DELETE LOGIC ---
         function openAddModal() {
             document.getElementById('modal-title').innerText = "Add New Character";
             resetForm();
@@ -823,8 +943,16 @@ function doPost(e) {
             document.getElementById('npc-modal').style.display = 'flex';
         }
 
+        function deleteEntity(id) {
+            if(confirm("Are you sure you want to permanently delete this character?")) {
+                state.entities = state.entities.filter(e => e.id !== id);
+                saveLocalDatabase();
+                renderAll();
+            }
+        }
+
         function saveEntity() {
-            const id = document.getElementById('npc-modal').dataset.editId || Date.now().toString();
+            const id = document.getElementById('npc-modal').dataset.editId || 'ent_' + Date.now() + Math.floor(Math.random() * 1000);
             const activeStatuses = Array.from(document.querySelectorAll('.status-cb:checked')).map(cb => cb.value);
 
             const existingEnt = state.entities.find(e => e.id === id) || {};
