@@ -65,7 +65,7 @@
         .modal-box { background: #2a2a35; padding: 25px; border-radius: 8px; width: 90%; max-width: 600px; max-height: 90vh; overflow-y: auto; position: relative; }
         
         /* Setup Instructions Specifics */
-        .instructions-box { background: #1a1a20; padding: 15px; border-radius: 6px; border: 1px solid #444; font-size: 13px; line-height: 1.5; margin: 15px 0; color: #bdc3c7; max-height: 250px; overflow-y: auto; }
+        .instructions-box { background: #1a1a20; padding: 15px; border-radius: 6px; border: 1px solid #444; font-size: 13px; line-height: 1.5; margin: 15px 0; color: #bdc3c7; max-height: 400px; overflow-y: auto; }
         .instructions-box h3 { color: #f1c40f; margin-top: 0; }
         .error-text { color: #e74c3c; font-weight: bold; margin-bottom: 15px; display: none; background: #4a1919; padding: 10px; border-radius: 4px; border: 1px solid #e74c3c; }
     </style>
@@ -169,14 +169,101 @@
                             <li>In the <strong>PCs</strong> sheet, you can manually type <code>PlayerName</code> and <code>PIN</code> as column headers to create player logins.</li>
                         </ul>
                     </li>
-                    <li><strong>Add the Code:</strong>
+                    <li style="margin-top: 10px;"><strong>Add the Code:</strong>
                         <ul>
                             <li>Click <strong>Extensions &gt; Apps Script</strong>.</li>
-                            <li>Paste the provided <code>doGet</code> and <code>doPost</code> database script.</li>
+                            <li>Paste the provided database script below (replacing any existing code).</li>
+                            
+                            <div style="position: relative; margin: 10px 0;">
+                                <textarea id="gas-script-code" readonly style="width: 100%; height: 160px; font-family: monospace; font-size: 11px; background: #111; color: #2ecc71; padding: 10px; border: 1px solid #444; border-radius: 4px; resize: vertical;">
+const NPC_SHEET = "NPCs";
+const PC_SHEET = "PCs";
+const BACKEND_VERSION = "1.0";
+const DB_TYPE = "NPC Database";
+
+function doGet(e) {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const getSheetData = (sheetName) => {
+      let s = ss.getSheetByName(sheetName);
+      let arr = [];
+      if (s) {
+        let data = s.getDataRange().getValues();
+        if (data.length > 1) {
+          let headers = data[0];
+          for (let i = 1; i < data.length; i++) {
+            let obj = {};
+            headers.forEach((h, idx) => { 
+                let val = data[i][idx];
+                try { 
+                    if (typeof val === 'string' && (val.startsWith('[') || val.startsWith('{'))) {
+                        obj[h] = JSON.parse(val); 
+                    } else {
+                        obj[h] = val;
+                    }
+                }
+                catch(e) { obj[h] = val; }
+            });
+            arr.push(obj);
+          }
+        }
+      }
+      return arr;
+    };
+    return ContentService.createTextOutput(JSON.stringify({
+        dbType: DB_TYPE, 
+        backendVersion: BACKEND_VERSION, 
+        npcs: getSheetData(NPC_SHEET), 
+        pcs: getSheetData(PC_SHEET)
+    })).setMimeType(ContentService.MimeType.JSON);
+  } catch(err) {
+    return ContentService.createTextOutput(JSON.stringify({error: err.toString()})).setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+function doPost(e) {
+  try {
+    const p = JSON.parse(e.postData.contents);
+    if (p.action === 'saveData') {
+        const saveSheet = (sheetName, dataArray) => {
+            let ss = SpreadsheetApp.getActiveSpreadsheet();
+            let s = ss.getSheetByName(sheetName);
+            if(!s) s = ss.insertSheet(sheetName);
+            s.clear();
+            if(dataArray && dataArray.length > 0) {
+                // Collect all unique headers to ensure no missing columns
+                let headerSet = new Set();
+                dataArray.forEach(item => Object.keys(item).forEach(k => headerSet.add(k)));
+                let headers = Array.from(headerSet);
+                let rows = [headers];
+                
+                dataArray.forEach(item => { 
+                    rows.push(headers.map(h => {
+                        let val = item[h];
+                        if (val === undefined || val === null) return "";
+                        if (typeof val === 'boolean') return val ? "TRUE" : "FALSE";
+                        if (typeof val === 'object') return JSON.stringify(val);
+                        return val;
+                    })); 
+                });
+                s.getRange(1, 1, rows.length, headers.length).setValues(rows);
+            }
+        };
+        saveSheet(NPC_SHEET, p.npcs);
+        saveSheet(PC_SHEET, p.pcs);
+        return ContentService.createTextOutput(JSON.stringify({status: "success"})).setMimeType(ContentService.MimeType.JSON);
+    }
+  } catch(err) {
+    return ContentService.createTextOutput(JSON.stringify({error: err.toString()})).setMimeType(ContentService.MimeType.JSON);
+  }
+}
+                                </textarea>
+                                <button onclick="copyGasScript()" style="position: absolute; top: 10px; right: 20px; background: #3498db; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 11px; font-weight: bold;">📋 Copy Script</button>
+                            </div>
                             <li>Click the <strong>Save</strong> icon.</li>
                         </ul>
                     </li>
-                    <li><strong>Deploy the Web App:</strong>
+                    <li style="margin-top: 10px;"><strong>Deploy the Web App:</strong>
                         <ul>
                             <li>In the top right corner, click <strong>Deploy &gt; New deployment</strong>.</li>
                             <li>Click the gear icon ⚙️ next to "Select type" and choose <strong>Web app</strong>.</li>
@@ -185,7 +272,7 @@
                             <li>Click <strong>Deploy</strong> and authorize permissions.</li>
                         </ul>
                     </li>
-                    <li><strong>Link the App:</strong>
+                    <li style="margin-top: 10px;"><strong>Link the App:</strong>
                         <ul>
                             <li>Copy the <strong>Web app URL</strong> provided by Google.</li>
                             <li>Paste it into the input box above!</li>
@@ -310,6 +397,16 @@
                 colorDark : "#000000",
                 colorLight : "#ffffff",
                 correctLevel : QRCode.CorrectLevel.L
+            });
+        }
+
+        function copyGasScript() {
+            const scriptText = document.getElementById('gas-script-code').value;
+            navigator.clipboard.writeText(scriptText).then(() => {
+                alert("✅ Google Apps Script copied to clipboard!");
+            }).catch(err => {
+                console.error("Failed to copy text: ", err);
+                alert("Failed to copy. Please manually select the text inside the box and copy it.");
             });
         }
 
