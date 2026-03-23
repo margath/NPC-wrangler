@@ -101,7 +101,8 @@
         .btn-add { background: var(--accent-green); color: #111; }
         .btn-dm { background: var(--accent-purple); color: white; }
         .btn-rest { background: #e67e22; color: white; }
-        .btn-init { background: var(--accent-blue); color: white; font-size: 10px; padding: 4px 8px; }
+        .btn-init { background: var(--accent-blue); color: white; font-size: 10px; padding: 4px 8px; } /* Small button for cards */
+        .btn-combat-toggle { background: var(--accent-blue); color: white; } /* Full size button for toolbar */
         .btn-setup { background: #7f8c8d; color: white; }
         .btn-setup.configured { background: var(--accent-green); color: #111; }
 
@@ -143,12 +144,30 @@
         <select id="hometown-focus" style="width:180px;" onchange="renderAll()"><option value="">Hometown Focus...</option></select>
         <button class="btn-rest" onclick="performLongRest()">⛺ Long Rest</button>
         <button class="btn-dm" onclick="exportSessionLog()">📋 Export Log</button>
-        <button class="btn-init" onclick="toggleInitiative()">⚔️ Toggle Combat</button>
+        <button class="btn-combat-toggle" onclick="toggleInitiative()">⚔️ Toggle Combat</button>
     </div>
 
     <main id="main-grid" class="grid-view"></main>
 
     <a href="/privacy" class="privacy-link" target="_blank">Privacy Policy</a>
+
+    <div id="db-upgrade-modal" class="modal-overlay" style="z-index: 9999;">
+        <div class="modal-box" style="border-color: #e74c3c;">
+            <h2 style="color: #e74c3c; margin-top:0;">⚠️ Database Upgrade Required</h2>
+            <p>Your Google Apps Script backend is outdated or connected to a different tool (like the Item Tracker). This application requires the <strong>NPC Database v1.0</strong> script to prevent data loss.</p>
+            <ol class="setup-steps">
+                <li>Go to your Google Sheet and click <strong>Extensions > Apps Script</strong>.</li>
+                <li>Replace all existing code with the new code from the Setup screen.</li>
+                <li>Click <strong>Deploy > Manage Deployments</strong>.</li>
+                <li>Click the Pencil Icon (Edit), change the Version dropdown to <strong>New Version</strong>, and click Deploy.</li>
+                <li>Refresh this page.</li>
+            </ol>
+            <div style="display:flex; gap:10px; margin-top:20px;">
+                <button onclick="closeModal('db-upgrade-modal'); openSetup();" class="btn-add" style="flex:1;">Get New Apps Script Code</button>
+                <button onclick="disconnectCloud(); closeModal('db-upgrade-modal');" style="background:#555; color:white;">Disconnect</button>
+            </div>
+        </div>
+    </div>
 
     <div id="setup-screen" class="modal-overlay">
         <div class="modal-box">
@@ -170,7 +189,8 @@
                     <pre class="code-block" id="app-script-code">
 const NPC_SHEET = "NPCs";
 const PC_SHEET = "PCs";
-const BACKEND_VERSION = "4.0";
+const BACKEND_VERSION = "1.0";
+const DB_TYPE = "NPC Database";
 
 function doGet(e) {
   try {
@@ -185,8 +205,15 @@ function doGet(e) {
           for (let i = 1; i < data.length; i++) {
             let obj = {};
             headers.forEach((h, idx) => { 
-                try { obj[h] = data[i][idx] ? JSON.parse(data[i][idx]) : ""; }
-                catch(e) { obj[h] = data[i][idx]; }
+                let val = data[i][idx];
+                try { 
+                    if (typeof val === 'string' && (val.startsWith('[') || val.startsWith('{'))) {
+                        obj[h] = JSON.parse(val); 
+                    } else {
+                        obj[h] = val;
+                    }
+                }
+                catch(e) { obj[h] = val; }
             });
             arr.push(obj);
           }
@@ -194,7 +221,12 @@ function doGet(e) {
       }
       return arr;
     };
-    return ContentService.createTextOutput(JSON.stringify({backendVersion: BACKEND_VERSION, npcs: getSheetData(NPC_SHEET), pcs: getSheetData(PC_SHEET)})).setMimeType(ContentService.MimeType.JSON);
+    return ContentService.createTextOutput(JSON.stringify({
+        dbType: DB_TYPE, 
+        backendVersion: BACKEND_VERSION, 
+        npcs: getSheetData(NPC_SHEET), 
+        pcs: getSheetData(PC_SHEET)
+    })).setMimeType(ContentService.MimeType.JSON);
   } catch(err) {
     return ContentService.createTextOutput(JSON.stringify({error: err.toString()})).setMimeType(ContentService.MimeType.JSON);
   }
@@ -210,9 +242,21 @@ function doPost(e) {
             if(!s) s = ss.insertSheet(sheetName);
             s.clear();
             if(dataArray && dataArray.length > 0) {
-                let headers = Object.keys(dataArray[0]);
+                // Collect all unique headers to ensure no missing columns
+                let headerSet = new Set();
+                dataArray.forEach(item => Object.keys(item).forEach(k => headerSet.add(k)));
+                let headers = Array.from(headerSet);
                 let rows = [headers];
-                dataArray.forEach(item => { rows.push(headers.map(h => JSON.stringify(item[h]))); });
+                
+                dataArray.forEach(item => { 
+                    rows.push(headers.map(h => {
+                        let val = item[h];
+                        if (val === undefined || val === null) return "";
+                        if (typeof val === 'boolean') return val ? "TRUE" : "FALSE";
+                        if (typeof val === 'object') return JSON.stringify(val);
+                        return val;
+                    })); 
+                });
                 s.getRange(1, 1, rows.length, headers.length).setValues(rows);
             }
         };
@@ -279,6 +323,8 @@ function doPost(e) {
 
     <script>
         // --- CONFIG & STATE ---
+        const REQUIRED_DB_TYPE = "NPC Database";
+        const REQUIRED_BACKEND_VERSION = "1.0";
         const STATUS_OPTIONS = [
             "Incapacitated", "Unconscious", "Dead", "Blinded", "Charmed", "Frightened", 
             "Grappled", "Paralyzed", "Petrified", "Poisoned", "Prone", "Restrained", "Stunned",
@@ -322,6 +368,7 @@ function doPost(e) {
             document.getElementById('setup-btn-header').className = state.scriptUrl ? 'btn-setup configured' : 'btn-setup';
             document.getElementById('setup-btn-header').innerHTML = state.scriptUrl ? '⚙️✅ Cloud Active' : '⚙️ Setup Cloud';
             document.getElementById('btn-load').style.display = state.scriptUrl ? 'block' : 'none';
+            
             if (state.currentUser) {
                 document.getElementById('login-btn-display').innerText = `User: ${state.currentUser}`;
                 document.getElementById('login-btn-display').style.background = state.isDM ? "var(--accent-purple)" : "var(--accent-blue)";
@@ -483,10 +530,17 @@ function doPost(e) {
             try {
                 const response = await fetch(state.scriptUrl);
                 const data = await response.json();
+                
+                // Version Verification Check
+                if (data.dbType !== REQUIRED_DB_TYPE || String(data.backendVersion) !== REQUIRED_BACKEND_VERSION) {
+                    document.getElementById('db-upgrade-modal').style.display = 'flex';
+                    btn.innerText = "⚠️ Upgrade Req"; btn.disabled = false;
+                    return;
+                }
+
                 if (data.npcs && data.npcs.length > 0) state.npcs = data.npcs;
                 if (data.pcs && data.pcs.length > 0) state.pcs = data.pcs;
                 
-                // Save locally so offline mode works
                 localStorage.setItem('npcs', JSON.stringify(state.npcs));
                 localStorage.setItem('pcs', JSON.stringify(state.pcs));
             } catch(e) { console.error(e); notify("Failed to load cloud data."); }
@@ -554,7 +608,7 @@ function doPost(e) {
             document.getElementById('modal-title').innerText = `Edit ${pc.character}`;
             
             let statusGrid = STATUS_OPTIONS.map(s => `
-                <button type="button" class="toggle-btn status-btn ${pc.statuses.includes(s) ? 'active-status' : ''}" 
+                <button type="button" class="toggle-btn status-btn ${(pc.statuses || []).includes(s) ? 'active-status' : ''}" 
                     style="width: 31%; margin:1%; font-size:10px;" value="${s}" 
                     onclick="this.classList.toggle('active-status')">${s}</button>
             `).join('');
