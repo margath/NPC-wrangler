@@ -3,720 +3,525 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NPC & Combat Tracker</title>
+    <title>NPC & PC Tracker - Version 1.0</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
     <style>
-        :root {
-            --bg-dark: #1e1e24;
-            --card-bg: #2a2a35;
-            --accent-blue: #3498db;
-            --accent-green: #2ecc71;
-            --accent-purple: #9b59b6;
-            --accent-gold: #f1c40f;
-            --accent-red: #e74c3c;
-            --text-light: #e0e0e0;
-        }
-
-        body {
-            font-family: system-ui, -apple-system, sans-serif;
-            margin: 0; background-color: var(--bg-dark); color: var(--text-light);
-            display: flex; flex-direction: column; min-height: 100vh;
-            padding-bottom: 40px; 
-        }
-
-        /* Top Bar */
-        header {
-            background: #2b2b36; padding: 15px 30px; display: flex;
-            justify-content: space-between; align-items: center;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.4); border-bottom: 1px solid #444;
-            flex-wrap: wrap; gap: 10px;
-        }
-
-        header h1 { margin: 0; font-size: 20px; display: flex; align-items: center; gap: 15px; }
-        .header-controls { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
-
-        .dm-toolbar {
-            background: #1a1a20; padding: 10px 30px; border-bottom: 1px solid #444;
-            display: flex; gap: 15px; align-items: center; flex-wrap: wrap;
-        }
-
-        .grid-view {
-            padding: 20px 30px; display: grid; gap: 20px;
-            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
-        }
-
-        .section-header {
-            grid-column: 1 / -1; font-size: 22px; border-bottom: 2px solid #444;
-            padding-bottom: 8px; margin-top: 20px; color: var(--accent-blue);
-            display: flex; justify-content: space-between; align-items: center;
-        }
-
-        /* Setup Modal Styles */
-        .setup-steps { font-size: 14px; line-height: 1.5; color: #ccc; margin-left: 0; padding-left: 20px;}
-        .setup-steps li { margin-bottom: 12px; }
-        .setup-steps strong { color: var(--accent-blue); }
-        pre.code-block { background: #111; border: 1px solid #444; padding: 15px; border-radius: 6px; font-size: 11px; overflow-x: auto; color: #a6e22e; }
-
-        /* Initiative Styles */
-        .init-tracker {
-            grid-column: 1 / -1; background: #16161d; padding: 15px; border-radius: 8px;
-            border: 1px solid #444; margin-bottom: 10px;
-        }
-        .init-list { display: flex; flex-direction: column; gap: 5px; margin-top: 10px; }
-        .init-row {
-            display: flex; align-items: center; background: #2a2a35; padding: 8px 15px;
-            border-radius: 4px; border-left: 4px solid transparent; gap: 15px;
-        }
-        .init-row.active { border-left-color: var(--accent-green); background: #34495e; }
-        .init-score { font-weight: bold; color: var(--accent-gold); width: 30px; }
-        .init-name { flex-grow: 1; font-weight: bold; }
-
+        /* Base styles */
+        body { font-family: system-ui, -apple-system, sans-serif; margin: 0; background-color: #1e1e24; color: #e0e0e0; display: flex; flex-direction: column; min-height: 100vh; }
+        header { background: #2b2b36; padding: 15px 30px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #444; flex-wrap: wrap; gap: 10px; }
+        .grid-view { padding: 30px; display: grid; gap: 20px; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); }
+        
         /* Card Styles */
-        .card { background: var(--card-bg); border-radius: 10px; border: 1px solid #444; display: flex; flex-direction: column; overflow: hidden; position: relative; }
-        .npc-card.travelling { border: 2px solid var(--accent-green); }
-        .npc-card.hometown-focus { border: 2px solid var(--accent-blue); }
-        .pc-card { border-left: 5px solid var(--accent-gold); }
+        .npc-card { background: #2a2a35; border-radius: 10px; border: 1px solid #444; position: relative; display: flex; flex-direction: column; overflow: hidden; transition: transform 0.2s; }
+        .npc-card.pc { border: 2px solid #f1c40f; box-shadow: 0 0 10px rgba(241, 196, 15, 0.2); }
+        .npc-card.travelling { border: 2px solid #2ecc71; box-shadow: 0 0 10px rgba(46, 204, 113, 0.2); }
+        .npc-card.hometown-focus { border: 2px solid #3498db; }
+        .npc-card.dead { opacity: 0.6; filter: grayscale(0.8); }
+        .card-content { padding: 15px; flex-grow: 1; }
         
-        .card-content { padding: 15px; flex-grow: 1; display: flex; flex-direction: column; gap: 8px; }
-        .name-row { display: flex; justify-content: space-between; align-items: flex-start; }
-        .title { font-size: 20px; font-weight: bold; margin: 0; }
-        .meta { font-size: 11px; text-transform: uppercase; color: #aaa; font-weight: bold; }
+        .npc-name { font-size: 20px; margin: 0; color: #fff; display: flex; justify-content: space-between; align-items: center; }
+        .npc-meta { font-size: 12px; color: #3498db; font-weight: bold; text-transform: uppercase; margin-bottom: 8px; }
+        .npc-tagline { font-size: 13px; color: #bdc3c7; font-style: italic; margin-bottom: 5px; }
+        .description-box { background: #1a1a20; padding: 10px; border-radius: 4px; font-size: 13px; margin: 10px 0; border: 1px solid #333; min-height: 40px; }
+        .secret-box { background: #2d1b2d; border: 1px solid #9b59b6; color: #d192e8; padding: 10px; border-radius: 4px; font-size: 13px; font-style: italic; margin-bottom: 10px; }
         
-        .desc-box { background: #1a1a20; padding: 10px; border-radius: 4px; font-size: 13px; border: 1px solid #333; white-space: pre-wrap; }
-        .secret-box { background: #2d1b2d; border: 1px solid var(--accent-purple); color: #d192e8; padding: 10px; border-radius: 4px; font-size: 13px; font-style: italic; }
-
-        .tag-line { margin-top: 5px; font-size: 13px; color: #ccc; }
-        .badge-tag { background: var(--accent-gold); color: #000; padding: 2px 8px; border-radius: 12px; font-weight: bold; font-size: 11px; text-transform: uppercase; }
-
-        .status-tray { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 5px; }
-        .status-badge { font-size: 10px; padding: 2px 6px; border-radius: 3px; background: #444; color: #eee; font-weight: bold; text-transform: uppercase; }
-        .status-badge.dead { background: #000; color: var(--accent-red); border: 1px solid var(--accent-red); }
-        .status-badge.unconscious { background: var(--accent-red); }
-        .status-badge.revived { background: var(--accent-blue); }
-
-        /* Form Elements & Toggle Buttons */
+        /* Badges & Statuses */
+        .badge { padding: 2px 6px; border-radius: 4px; font-size: 10px; margin-left: 5px; vertical-align: middle; font-weight: bold; color: #000; }
+        .badge-pc { background: #f1c40f; }
+        .badge-travelling { background: #2ecc71; }
+        .status-container { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 10px; }
+        .status-pill { background: #e74c3c; color: white; padding: 3px 8px; border-radius: 12px; font-size: 11px; font-weight: bold; }
+        .status-pill.revived { background: #e67e22; }
+        
+        /* Forms & Inputs */
         input, select, textarea { width: 100%; padding: 8px; margin: 5px 0; border-radius: 4px; border: 1px solid #444; background: #1a1a20; color: white; box-sizing: border-box; }
-        button { cursor: pointer; border: none; padding: 8px 12px; border-radius: 4px; font-weight: bold; transition: opacity 0.2s, background 0.2s; }
+        .checkbox-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; background: #1a1a20; padding: 10px; border-radius: 4px; border: 1px solid #444; max-height: 150px; overflow-y: auto; }
+        .checkbox-grid label { font-size: 12px; display: flex; align-items: center; gap: 5px; cursor: pointer; }
+        .checkbox-grid input[type="checkbox"] { width: auto; margin: 0; }
+
+        /* Buttons & UI (Height matched) */
+        .controls { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+        .controls select, .controls button { height: 38px; box-sizing: border-box; margin: 0; padding: 0 15px; font-size: 14px; border-radius: 4px; border: none; font-weight: bold; cursor: pointer; transition: opacity 0.2s; display: inline-flex; align-items: center; justify-content: center; }
+        .controls select { width: auto; background: #1a1a20; border: 1px solid #444; color: white; }
         
-        .btn-add { background: var(--accent-green); color: #111; }
-        .btn-dm { background: var(--accent-purple); color: white; }
-        .btn-rest { background: #e67e22; color: white; }
-        .btn-init { background: var(--accent-blue); color: white; font-size: 10px; padding: 4px 8px; } /* Small button for cards */
-        .btn-combat-toggle { background: var(--accent-blue); color: white; } /* Full size button for toolbar */
-        .btn-setup { background: #7f8c8d; color: white; }
-        .btn-setup.configured { background: var(--accent-green); color: #111; }
-
-        .toggle-btn { background: #111; color: #aaa; border: 1px solid #444; padding: 8px 10px; font-size: 12px; width: 100%; text-align: center; }
-        .toggle-btn.active { background: var(--accent-green); color: #111; border-color: var(--accent-green); }
-        .toggle-btn.active-status { background: var(--accent-red); color: white; border-color: var(--accent-red); }
-
-        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(30, 30, 36, 0.95); z-index: 1000; display: none; justify-content: center; align-items: center; }
-        .modal-box { background: var(--card-bg); padding: 25px; border-radius: 8px; width: 90%; max-width: 600px; max-height: 90vh; overflow-y: auto; border: 1px solid #444; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+        button.add-btn { background: #2ecc71; color: #111; }
+        button.dm-btn { background: #9b59b6; color: white; }
+        button.combat-btn { background: #e74c3c; color: white; }
+        button.combat-btn.active { background: #c0392b; border: 2px solid #fff; }
+        button.rest-btn { background: #3498db; color: white; }
+        button.login-btn { background: #f39c12; color: #111; }
         
-        #toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: #333; color: white; padding: 10px 20px; border-radius: 20px; opacity: 0; transition: opacity 0.3s; z-index: 2000; font-weight: bold; pointer-events: none; }
-
-        .privacy-link { position: fixed; bottom: 10px; left: 15px; font-size: 11px; color: #888; text-decoration: none; z-index: 100; transition: color 0.2s; }
-        .privacy-link:hover { color: var(--accent-blue); text-decoration: underline; }
+        /* Initiative */
+        .init-box { display: flex; align-items: center; gap: 5px; background: #1a1a20; padding: 5px; border-radius: 4px; border: 1px solid #444; margin-top: 10px; }
+        .init-box input { width: 60px; margin: 0; text-align: center; font-weight: bold; font-size: 16px; }
+        
+        /* Modals */
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 1000; display: none; justify-content: center; align-items: center; }
+        .modal-box { background: #2a2a35; padding: 25px; border-radius: 8px; width: 90%; max-width: 500px; max-height: 90vh; overflow-y: auto; }
     </style>
 </head>
 <body>
 
-    <div id="toast"></div>
-
     <header>
-        <h1>
-            <a href="https://tools.gameportal.win/" target="_blank" title="Visit GamePortal Tools" style="display:flex; align-items:center;">
-                <svg width="26" height="26" viewBox="0 0 24 24" fill="#3498db" xmlns="http://www.w3.org/2000/svg" style="background:white; border-radius:4px; padding:2px;">
-                    <path d="M3 3h8v8H3V3zm2 2v4h4V5H5zm8-2h8v8h-8V3zm2 2v4h4V5h-4zM3 13h8v8H3v-8zm2 2v4h4v-4H5zm13-2h3v2h-3v-2zm-3 0h2v2h-2v-2zm3 3h3v2h-3v-2zm-3 0h2v2h-2v-2zm3 3h3v2h-3v-2zm-3 0h2v2h-2v-2z"/>
-                </svg>
-            </a>
-            🎭 NPC & Combat Tracker
-        </h1>
-        <div class="header-controls">
-            <button id="btn-load" class="btn-setup" style="display:none;" onclick="loadFromCloud()">📥 Sync</button>
-            <button id="login-btn-display" style="background:#444; color:white;" onclick="openLoginModal()">👤 Log In</button>
-            <button class="btn-add" onclick="openNPCModal()">+ New NPC</button>
-            <button id="setup-btn-header" class="btn-setup" onclick="openSetup()">⚙️ Setup Cloud</button>
+        <h1 style="margin: 0; font-size: 24px;">👤 NPC Tracker <span style="font-size: 12px; color: #888;">v1.0</span></h1>
+        <div class="controls">
+            <select id="hometown-filter" onchange="renderAll()">
+                <option value="">Sort by Hometown...</option>
+            </select>
+            <button class="combat-btn" id="combat-toggle-btn" onclick="toggleCombat()">⚔️ Toggle Combat</button>
+            <button class="rest-btn" onclick="triggerLongRest()">🏕️ Long Rest</button>
+            <button class="dm-btn" onclick="exportSessionLog()">📋 Copy Session Log</button>
+            <button class="add-btn" onclick="openAddModal()">+ New PC/NPC</button>
+            <button class="login-btn" id="login-btn" onclick="openLoginModal()">Login</button>
         </div>
     </header>
 
-    <div class="dm-toolbar">
-        <select id="hometown-focus" style="width:180px;" onchange="renderAll()"><option value="">Hometown Focus...</option></select>
-        <button class="btn-rest" onclick="performLongRest()">⛺ Long Rest</button>
-        <button class="btn-dm" onclick="exportSessionLog()">📋 Export Log</button>
-        <button class="btn-combat-toggle" onclick="toggleInitiative()">⚔️ Toggle Combat</button>
-    </div>
+    <main id="npc-grid" class="grid-view"></main>
 
-    <main id="main-grid" class="grid-view"></main>
-
-    <a href="/privacy" class="privacy-link" target="_blank">Privacy Policy</a>
-
-    <div id="db-upgrade-modal" class="modal-overlay" style="z-index: 9999;">
-        <div class="modal-box" style="border-color: #e74c3c;">
-            <h2 style="color: #e74c3c; margin-top:0;">⚠️ Database Upgrade Required</h2>
-            <p>Your Google Apps Script backend is outdated or connected to a different tool (like the Item Tracker). This application requires the <strong>NPC Database v1.0</strong> script to prevent data loss.</p>
-            <ol class="setup-steps">
-                <li>Go to your Google Sheet and click <strong>Extensions > Apps Script</strong>.</li>
-                <li>Replace all existing code with the new code from the Setup screen.</li>
-                <li>Click <strong>Deploy > Manage Deployments</strong>.</li>
-                <li>Click the Pencil Icon (Edit), change the Version dropdown to <strong>New Version</strong>, and click Deploy.</li>
-                <li>Refresh this page.</li>
-            </ol>
-            <div style="display:flex; gap:10px; margin-top:20px;">
-                <button onclick="closeModal('db-upgrade-modal'); openSetup();" class="btn-add" style="flex:1;">Get New Apps Script Code</button>
-                <button onclick="disconnectCloud(); closeModal('db-upgrade-modal');" style="background:#555; color:white;">Disconnect</button>
-            </div>
-        </div>
-    </div>
-
-    <div id="setup-screen" class="modal-overlay">
+    <div id="npc-modal" class="modal-overlay">
         <div class="modal-box">
-            <h2 style="margin-top:0; border-bottom:1px solid #555; padding-bottom:10px;">⚙️ Google Sheets Cloud Setup</h2>
-            <div id="setup-instructions-container">
-                <p style="font-size: 13px; color: #ccc;">Connect this app to a Google Sheet to sync your Campaign Data automatically across devices.</p>
-                <ol class="setup-steps">
-                    <li>Create a new <a href="https://sheets.new" target="_blank" style="color:var(--accent-blue);">Google Sheet</a>.</li>
-                    <li>In the top menu, click <strong>Extensions > Apps Script</strong>.</li>
-                    <li>Delete any default code and paste the script below.</li>
-                    <li>Click <strong>Deploy > New deployment</strong>. Select type <strong>Web app</strong>.</li>
-                    <li>Set 'Execute as' to <strong>Me</strong> and 'Who has access' to <strong>Anyone</strong>.</li>
-                    <li>Click Deploy, Authorize permissions, and copy the <strong>Web app URL</strong>.</li>
-                    <li><em>Note: After your first sync, edit the 'pin' column in your new PCs sheet to set player passwords.</em></li>
-                </ol>
-
-                <div style="position: relative;">
-                    <button onclick="copyScriptCode()" style="position: absolute; top: 10px; right: 10px; font-size: 11px; padding: 4px 8px; background:#444; color:white;">📋 Copy Code</button>
-                    <pre class="code-block" id="app-script-code">
-const NPC_SHEET = "NPCs";
-const PC_SHEET = "PCs";
-const BACKEND_VERSION = "1.0";
-const DB_TYPE = "NPC Database";
-
-function doGet(e) {
-  try {
-    const ss = SpreadsheetApp.getActiveSpreadsheet();
-    const getSheetData = (sheetName) => {
-      let s = ss.getSheetByName(sheetName);
-      let arr = [];
-      if (s) {
-        let data = s.getDataRange().getValues();
-        if (data.length > 1) {
-          let headers = data[0];
-          for (let i = 1; i < data.length; i++) {
-            let obj = {};
-            headers.forEach((h, idx) => { 
-                let val = data[i][idx];
-                try { 
-                    if (typeof val === 'string' && (val.startsWith('[') || val.startsWith('{'))) {
-                        obj[h] = JSON.parse(val); 
-                    } else {
-                        obj[h] = val;
-                    }
-                }
-                catch(e) { obj[h] = val; }
-            });
-            arr.push(obj);
-          }
-        }
-      }
-      return arr;
-    };
-    return ContentService.createTextOutput(JSON.stringify({
-        dbType: DB_TYPE, 
-        backendVersion: BACKEND_VERSION, 
-        npcs: getSheetData(NPC_SHEET), 
-        pcs: getSheetData(PC_SHEET)
-    })).setMimeType(ContentService.MimeType.JSON);
-  } catch(err) {
-    return ContentService.createTextOutput(JSON.stringify({error: err.toString()})).setMimeType(ContentService.MimeType.JSON);
-  }
-}
-
-function doPost(e) {
-  try {
-    const p = JSON.parse(e.postData.contents);
-    if (p.action === 'saveData') {
-        const saveSheet = (sheetName, dataArray) => {
-            let ss = SpreadsheetApp.getActiveSpreadsheet();
-            let s = ss.getSheetByName(sheetName);
-            if(!s) s = ss.insertSheet(sheetName);
-            s.clear();
-            if(dataArray && dataArray.length > 0) {
-                // Collect all unique headers to ensure no missing columns
-                let headerSet = new Set();
-                dataArray.forEach(item => Object.keys(item).forEach(k => headerSet.add(k)));
-                let headers = Array.from(headerSet);
-                let rows = [headers];
-                
-                dataArray.forEach(item => { 
-                    rows.push(headers.map(h => {
-                        let val = item[h];
-                        if (val === undefined || val === null) return "";
-                        if (typeof val === 'boolean') return val ? "TRUE" : "FALSE";
-                        if (typeof val === 'object') return JSON.stringify(val);
-                        return val;
-                    })); 
-                });
-                s.getRange(1, 1, rows.length, headers.length).setValues(rows);
-            }
-        };
-        saveSheet(NPC_SHEET, p.npcs);
-        saveSheet(PC_SHEET, p.pcs);
-        return ContentService.createTextOutput(JSON.stringify({status: "success"})).setMimeType(ContentService.MimeType.JSON);
-    }
-  } catch(err) {
-    return ContentService.createTextOutput(JSON.stringify({error: err.toString()})).setMimeType(ContentService.MimeType.JSON);
-  }
-}
-</pre>
-                </div>
-            </div>
+            <h2 id="modal-title">Add PC/NPC</h2>
             
-            <div id="setup-input-view" style="margin-top: 15px; border-top: 1px dashed #555; padding-top: 15px;">
-                <label style="font-size: 13px; font-weight: bold;">Paste Your Web App URL Here:</label>
-                <input type="text" id="script-url-input" placeholder="https://script.google.com/macros/s/...">
-                <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 10px;">
-                    <button style="background: #555; color:white;" onclick="closeModal('setup-screen')">Close</button>
-                    <button class="btn-add" onclick="saveSetup()">Save & Sync</button>
-                </div>
-            </div>
+            <label style="font-size: 14px; font-weight: bold; margin-bottom: 10px; display: block;">
+                <input type="checkbox" id="f-isPC" style="width: auto;"> Is this a Player Character (PC)?
+            </label>
 
-            <div id="setup-configured-view" style="display: none; text-align: center; margin-top: 20px; border-top: 1px dashed #555; padding-top: 20px;">
-                <h3 style="color: var(--accent-green); margin: 0 0 10px 0;">✅ Connected to Cloud</h3>
-                <p style="font-size: 13px; color: #ccc; margin-bottom: 15px;">Have players scan this QR code or use the link below to join!</p>
-                <img id="qr-code-img" src="" alt="QR Code" style="margin: 0 auto; background: white; padding: 10px; border-radius: 8px; width: 150px; height: 150px; display:block;">
-                <div style="margin-top: 20px; display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;">
-                    <button onclick="copyJoinLink()" style="background: var(--accent-blue); color:white;">🔗 Copy Join Link</button>
-                    <button style="background: var(--accent-red); color:white;" onclick="disconnectCloud()">Disconnect App</button>
-                    <button style="background: #555; color:white;" onclick="closeModal('setup-screen')">Close</button>
-                </div>
-            </div>
+            <input type="text" id="f-name" placeholder="Name">
+            <input type="text" id="f-tagline" placeholder="Tagline (e.g. 'The brooding rogue')">
+            <input type="text" id="f-hometown" placeholder="Hometown (or select from list)">
+            <textarea id="f-description" placeholder="Public Description"></textarea>
+            <textarea id="f-secret" placeholder="Secret (DM/Owner Only)"></textarea>
             
-            <div style="text-align: center; margin-top:20px; font-size:12px;">
-                <a href="https://tools.gameportal.win/" target="_blank" style="color:var(--accent-blue); text-decoration:none;">More Tools at tools.gameportal.win</a>
+            <label style="font-size: 12px; margin-top: 10px; display: block;">
+                <input type="checkbox" id="f-travelling" style="width: auto;"> Currently travelling with party?
+            </label>
+
+            <h4 style="margin: 15px 0 5px 0;">Statuses</h4>
+            <div class="checkbox-grid" id="status-grid">
+                </div>
+
+            <div style="display:flex; gap: 10px; margin-top: 20px;">
+                <button onclick="saveEntity()" class="add-btn" style="flex:1; height: 40px;">Save</button>
+                <button onclick="closeModal('npc-modal')" style="background:#555; color:white; height: 40px;">Cancel</button>
             </div>
         </div>
     </div>
 
     <div id="login-modal" class="modal-overlay">
-        <div class="modal-box" style="max-width: 320px; text-align: center;">
-            <h2 style="margin-top:0; border-bottom:1px solid #555; padding-bottom:10px;">Select Character</h2>
-            <select id="login-name"></select>
-            <input type="password" id="login-pin" placeholder="Enter PIN (e.g., 1111)" onkeydown="if(event.key === 'Enter') submitLogin()">
-            <div style="display:flex; flex-direction:column; gap:10px; margin-top:15px;">
-                <button class="btn-add" onclick="submitLogin()">👤 Authenticate</button>
-                <button onclick="closeModal('login-modal')" style="background:#555; color:white;">Cancel</button>
+        <div class="modal-box" style="max-width: 300px;">
+            <h2>Player Login</h2>
+            <p style="font-size: 12px; color: #aaa;">Leave empty and click DM for Game Master access.</p>
+            <select id="login-player-select">
+                <option value="">Select Player...</option>
+                </select>
+            <input type="password" id="login-pin" placeholder="Enter PIN">
+            <div style="display:flex; gap: 10px; margin-top: 15px;">
+                <button onclick="attemptLogin()" class="login-btn" style="flex:1;">Login</button>
+                <button onclick="loginAsDM()" class="dm-btn" style="flex:1;">DM Override</button>
             </div>
-        </div>
-    </div>
-
-    <div id="edit-modal" class="modal-overlay">
-        <div class="modal-box">
-            <h2 id="modal-title" style="margin-top:0; border-bottom:1px solid #555; padding-bottom:10px;">Edit Entry</h2>
-            <div id="modal-fields"></div>
-            <div style="display:flex; gap:10px; margin-top:20px;">
-                <button class="btn-add" style="flex:1" onclick="saveEntry()">Save Changes</button>
-                <button onclick="closeModal('edit-modal')" style="background:#555; color:white;">Cancel</button>
-            </div>
+            <button onclick="closeModal('login-modal')" style="width: 100%; margin-top: 10px; background:#555; color:white; padding: 8px;">Cancel</button>
         </div>
     </div>
 
     <script>
-        // --- CONFIG & STATE ---
-        const REQUIRED_DB_TYPE = "NPC Database";
-        const REQUIRED_BACKEND_VERSION = "1.0";
-        const STATUS_OPTIONS = [
-            "Incapacitated", "Unconscious", "Dead", "Blinded", "Charmed", "Frightened", 
-            "Grappled", "Paralyzed", "Petrified", "Poisoned", "Prone", "Restrained", "Stunned",
-            "Revived -3", "Revived -2", "Revived -1"
+        // --- CONSTANTS & DATA ---
+        // Replace this URL with your published Google Sheet CSV export link if you have one.
+        // Columns needed: PlayerName, PIN, CharacterName
+        const SHEET_CSV_URL = ""; 
+        const HOMETOWNS = ["Solomani Rim", "Terra", "Vanejen", "Spinward Marches", "Waterdeep", "Neverwinter", "Baldur's Gate"];
+        const STATUSES = [
+            "Blinded", "Charmed", "Deafened", "Frightened", "Grappled", 
+            "Incapacitated", "Invisible", "Paralyzed", "Petrified", "Poisoned", 
+            "Prone", "Restrained", "Stunned", "Unconscious", "Exhaustion", 
+            "Dead", "Revived -3", "Revived -2", "Revived -1"
         ];
 
-        let state = {
-            scriptUrl: localStorage.getItem('campaignScriptUrl') || "",
-            currentUser: localStorage.getItem('user') || null,
-            isDM: localStorage.getItem('isDM') === 'true',
-            showInitiative: false,
-            initIndex: 0,
-            initiativeOrder: [],
-            autoSaveTimeout: null,
-            npcs: JSON.parse(localStorage.getItem('npcs')) || [
-                { id: 'npc_demo', name: 'Drax', hometown: 'Solomani Rim', description: 'A black-market tech dealer.', secret: 'Working for the authorities.', isTravelling: false, createdBy: 'DM' }
-            ],
-            pcs: JSON.parse(localStorage.getItem('pcs')) || [
-                { id: 'pc1', name: 'Hank', pin: '1111', character: 'Ranger', tagline: 'Tracking the Wolf', description: 'A grizzled scout.', statuses: [], secret: 'Owes a debt.' },
-                { id: 'pc2', name: 'Sheila', pin: '2222', character: 'Thief', tagline: 'Hiding in shadows', description: 'Expert in infiltration.', statuses: [], secret: 'Actually royalty.' },
-                { id: 'dm1', name: 'Dungeon Master', pin: '7777', character: 'DM', tagline: 'Weaving Fate', description: 'The orchestrator.', statuses: [], secret: 'Knows all.' }
-            ]
+        // --- STATE MANAGEMENT ---
+        const state = {
+            entities: [],
+            currentUser: null, // "DM" or Player Name
+            currentCharacter: null, // Tied to spreadsheet
+            isDM: false,
+            combatMode: false,
+            playersFromSheet: [] // Cached player list
         };
 
-        window.onload = () => {
-            const urlParams = new URLSearchParams(window.location.search);
-            const joinCode = urlParams.get('j');
-            if (joinCode) {
-                try {
-                    let decodedId = atob(joinCode);
-                    state.scriptUrl = "https://script.google.com/macros/s/" + decodedId + "/exec";
-                    localStorage.setItem('campaignScriptUrl', state.scriptUrl);
-                    window.history.replaceState({}, document.title, window.location.pathname); 
-                } catch(e) {}
-            }
-            if(state.scriptUrl) { loadFromCloud(); } else { renderAll(); }
-        };
-
-        // --- CORE FUNCTIONS & RENDERING ---
-        function renderAll() {
-            document.getElementById('setup-btn-header').className = state.scriptUrl ? 'btn-setup configured' : 'btn-setup';
-            document.getElementById('setup-btn-header').innerHTML = state.scriptUrl ? '⚙️✅ Cloud Active' : '⚙️ Setup Cloud';
-            document.getElementById('btn-load').style.display = state.scriptUrl ? 'block' : 'none';
+        // --- INIT & DATABASE VALIDATION ---
+        function init() {
+            checkDatabaseVersion();
             
-            if (state.currentUser) {
-                document.getElementById('login-btn-display').innerText = `User: ${state.currentUser}`;
-                document.getElementById('login-btn-display').style.background = state.isDM ? "var(--accent-purple)" : "var(--accent-blue)";
-            }
-
-            const grid = document.getElementById('main-grid');
-            const focus = document.getElementById('hometown-focus').value;
-            grid.innerHTML = '';
-
-            // 1. Initiative Tracker
-            if (state.showInitiative) {
-                const initBox = document.createElement('div');
-                initBox.className = 'init-tracker';
-                initBox.innerHTML = `
-                    <div class="section-header" style="margin-top:0">⚔️ Initiative Order
-                        <div style="display:flex; gap:5px">
-                            <button onclick="prevTurn()" style="background:#444; color:white;">←</button>
-                            <button onclick="nextTurn()" style="background:#444; color:white;">→</button>
-                            <button onclick="clearInit()" style="background:var(--accent-red); color:white;">Reset</button>
-                        </div>
-                    </div>
-                    <div class="init-list">${state.initiativeOrder.sort((a,b) => b.score - a.score).map((char, i) => `
-                        <div class="init-row ${state.initIndex === i ? 'active' : ''}">
-                            <div class="init-score">${char.score}</div>
-                            <div class="init-name">${char.name}</div>
-                            <button class="meta" style="background:transparent; border:none; cursor:pointer;" onclick="removeFromInit(${i})">❌</button>
-                        </div>
-                    `).join('')}</div>
-                `;
-                grid.appendChild(initBox);
-            }
-
-            // 2. Party Section
-            grid.innerHTML += `<div class="section-header">Party Status</div>`;
-            state.pcs.filter(p => p.character !== 'DM').forEach(pc => {
-                const card = document.createElement('div');
-                card.className = 'card pc-card';
-                const canSeeSecret = state.isDM || state.currentUser === pc.name;
-                
-                const statusHtml = (pc.statuses || []).map(s => {
-                    let cls = s.toLowerCase().includes('revived') ? 'revived' : s.toLowerCase().replace(/ /g,'');
-                    return `<span class="status-badge ${cls}">${s}</span>`;
-                }).join('');
-
-                card.innerHTML = `
-                    <div class="card-content">
-                        <div class="name-row">
-                            <div><span class="meta">Player: ${pc.name}</span><h3 class="title">${pc.character}</h3></div>
-                            <div class="status-tray">${statusHtml}</div>
-                        </div>
-                        <div class="tag-line">Current Focus: <span class="badge-tag">${pc.tagline || 'None'}</span></div>
-                        <div class="desc-box">${pc.description || 'No description set.'}</div>
-                        ${canSeeSecret ? `<div class="secret-box"><strong>PC Secret:</strong> ${pc.secret || 'None'}</div>` : ''}
-                        <div style="margin-top:auto; padding-top:10px; display:flex; gap:5px;">
-                            <button class="btn-init" onclick="addToInit('${pc.character}')">⚔️ Roll</button>
-                            ${(state.isDM || state.currentUser === pc.name) ? `<button class="meta" style="background:#444; color:white; padding:4px 8px;" onclick="openPCModal('${pc.id}')">Edit Status</button>` : ''}
-                        </div>
-                    </div>
-                `;
-                grid.appendChild(card);
+            // Setup Hometown Filter
+            const filter = document.getElementById('hometown-filter');
+            HOMETOWNS.forEach(h => {
+                const opt = document.createElement('option');
+                opt.value = h; opt.innerText = h;
+                filter.appendChild(opt);
             });
 
-            // 3. NPC Section
-            grid.innerHTML += `<div class="section-header">Non-Player Characters</div>`;
-            const sortedNPCs = [...state.npcs].sort((a, b) => {
-                const getWeight = (n) => {
-                    if (n.isTravelling) return 3;
-                    if (n.hometown === focus && focus !== "") return 2;
-                    return 1;
-                };
-                return getWeight(b) - getWeight(a) || a.name.localeCompare(b.name);
+            // Setup Status Checkboxes
+            const statusGrid = document.getElementById('status-grid');
+            STATUSES.forEach(s => {
+                statusGrid.innerHTML += `<label><input type="checkbox" value="${s}" class="status-cb"> ${s}</label>`;
             });
 
-            sortedNPCs.forEach(npc => {
-                const card = document.createElement('div');
-                card.className = `card npc-card ${npc.isTravelling ? 'travelling' : ''} ${npc.hometown === focus ? 'hometown-focus' : ''}`;
-                const isOwner = state.currentUser === npc.createdBy;
-                const canSeeSecret = state.isDM || isOwner;
-
-                card.innerHTML = `
-                    <div class="card-content">
-                        <div class="meta">${npc.hometown || 'Unknown'} ${npc.isTravelling ? '• <span style="color:var(--accent-green)">Travelling</span>' : ''}</div>
-                        <h3 class="title">${npc.name}</h3>
-                        <div class="desc-box">${npc.description || 'No description set.'}</div>
-                        ${canSeeSecret ? `<div class="secret-box"><strong>Secret:</strong> ${npc.secret || 'None'}</div>` : ''}
-                        <div style="margin-top:auto; padding-top:10px; display:flex; gap:5px;">
-                            <button class="btn-init" onclick="addToInit('${npc.name}')">⚔️ Roll</button>
-                            ${(state.isDM || isOwner) ? `<button class="meta" style="background:#444; color:white; padding:4px 8px;" onclick="openNPCModal('${npc.id}')">Edit NPC</button>` : ''}
-                        </div>
-                    </div>
-                `;
-                grid.appendChild(card);
-            });
-
-            updateHometownList();
-        }
-
-        function updateHometownList() {
-            const select = document.getElementById('hometown-focus');
-            const current = select.value;
-            const towns = [...new Set(state.npcs.map(n => n.hometown).filter(t => t))];
-            select.innerHTML = `<option value="">No Focus</option>`;
-            towns.sort().forEach(t => { select.innerHTML += `<option value="${t}" ${t === current ? 'selected' : ''}>${t}</option>`; });
-        }
-
-        // --- AUTHENTICATION ---
-        function openLoginModal() {
-            if (!state.pcs || state.pcs.length === 0) { notify("No players found. Please Sync Data first."); return; }
-            const select = document.getElementById('login-name');
-            select.innerHTML = '';
-            state.pcs.forEach(pc => {
-                select.innerHTML += `<option value="${pc.name}">${pc.name} (${pc.character})</option>`;
-            });
-            document.getElementById('login-pin').value = '';
-            document.getElementById('login-modal').style.display = 'flex';
-        }
-
-        function submitLogin() {
-            const name = document.getElementById('login-name').value;
-            const pin = document.getElementById('login-pin').value;
-            const user = state.pcs.find(p => p.name === name);
-            
-            if (user && String(user.pin) === String(pin)) {
-                state.currentUser = user.name;
-                state.isDM = (user.character === 'DM');
-                localStorage.setItem('user', state.currentUser);
-                localStorage.setItem('isDM', state.isDM);
-                closeModal('login-modal');
-                renderAll();
-                notify(`Welcome, ${state.currentUser}!`);
-            } else {
-                notify("Incorrect PIN.");
-            }
-        }
-
-        // --- CLOUD SYNC LOGIC ---
-        function triggerAutoSave() {
-            clearTimeout(state.autoSaveTimeout);
-            if(state.scriptUrl) {
-                document.getElementById('btn-load').innerText = "⏳ Saving...";
-                state.autoSaveTimeout = setTimeout(() => saveToCloud(), 1500);
-            }
-        }
-
-        async function saveToCloud() {
-            if (!state.scriptUrl) return;
-            try {
-                await fetch(state.scriptUrl, { 
-                    method: 'POST', body: JSON.stringify({ action: 'saveData', npcs: state.npcs, pcs: state.pcs }) 
-                });
-                document.getElementById('btn-load').innerText = "📥 Sync";
-            } catch(e) { notify("Cloud save failed."); }
-        }
-
-        async function loadFromCloud() {
-            if (!state.scriptUrl) return;
-            const btn = document.getElementById('btn-load');
-            btn.innerText = "⏳ Syncing..."; btn.disabled = true;
-            try {
-                const response = await fetch(state.scriptUrl);
-                const data = await response.json();
-                
-                // Version Verification Check
-                if (data.dbType !== REQUIRED_DB_TYPE || String(data.backendVersion) !== REQUIRED_BACKEND_VERSION) {
-                    document.getElementById('db-upgrade-modal').style.display = 'flex';
-                    btn.innerText = "⚠️ Upgrade Req"; btn.disabled = false;
-                    return;
-                }
-
-                if (data.npcs && data.npcs.length > 0) state.npcs = data.npcs;
-                if (data.pcs && data.pcs.length > 0) state.pcs = data.pcs;
-                
-                localStorage.setItem('npcs', JSON.stringify(state.npcs));
-                localStorage.setItem('pcs', JSON.stringify(state.pcs));
-            } catch(e) { console.error(e); notify("Failed to load cloud data."); }
-            btn.innerText = "📥 Sync"; btn.disabled = false;
+            fetchPlayersFromSheet();
             renderAll();
         }
 
-        // --- SETUP MODAL LOGIC ---
-        function openSetup() { 
-            document.getElementById('setup-instructions-container').style.display = state.scriptUrl ? 'none' : 'block';
-            document.getElementById('setup-configured-view').style.display = state.scriptUrl ? 'block' : 'none';
-            document.getElementById('setup-input-view').style.display = state.scriptUrl ? 'none' : 'block';
-            document.getElementById('script-url-input').value = state.scriptUrl;
-            
-            if (state.scriptUrl) {
-                let encodedCode = btoa(state.scriptUrl.match(/\/s\/([a-zA-Z0-9_-]+)\//)?.[1] || state.scriptUrl);
-                document.getElementById('qr-code-img').src = "https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=" + encodeURIComponent(window.location.href.split('?')[0] + "?j=" + encodedCode);
+        function checkDatabaseVersion() {
+            let dbData = localStorage.getItem('dndDatabase');
+            if (dbData) {
+                try {
+                    dbData = JSON.parse(dbData);
+                    if (dbData.type === 'NPC Database' && dbData.version === '1.0') {
+                        state.entities = dbData.entities || [];
+                        return;
+                    }
+                } catch (e) { console.error("Database parse error", e); }
             }
-            document.getElementById('setup-screen').style.display = 'flex';
+            // If missing or wrong version, initialize empty DB
+            state.entities = [];
+            saveDatabase();
         }
 
-        function saveSetup() {
-            state.scriptUrl = document.getElementById('script-url-input').value.trim();
-            localStorage.setItem('campaignScriptUrl', state.scriptUrl);
-            closeModal('setup-screen');
-            if (state.scriptUrl) loadFromCloud(); else renderAll();
+        function saveDatabase() {
+            const dbData = {
+                type: 'NPC Database',
+                version: '1.0',
+                entities: state.entities
+            };
+            localStorage.setItem('dndDatabase', JSON.stringify(dbData));
         }
 
-        function disconnectCloud() {
-            state.scriptUrl = ""; localStorage.removeItem('campaignScriptUrl');
-            closeModal('setup-screen'); notify("Disconnected from Cloud."); renderAll();
+        // --- GOOGLE SHEET LOGIN LOGIC ---
+        async function fetchPlayersFromSheet() {
+            if (!SHEET_CSV_URL) {
+                // Fallback dummy data if no spreadsheet provided
+                state.playersFromSheet = [
+                    { PlayerName: "Alice", PIN: "1234", CharacterName: "Lyra" },
+                    { PlayerName: "Bob", PIN: "5678", CharacterName: "Grog" }
+                ];
+                populateLoginDropdown();
+                return;
+            }
+            try {
+                const response = await fetch(SHEET_CSV_URL);
+                const csvText = await response.text();
+                // Simple CSV parse (assumes no commas inside quotes)
+                const rows = csvText.split('\n').map(r => r.split(','));
+                const headers = rows[0].map(h => h.trim());
+                
+                state.playersFromSheet = rows.slice(1).map(row => {
+                    let obj = {};
+                    row.forEach((val, i) => obj[headers[i]] = val ? val.trim() : '');
+                    return obj;
+                }).filter(p => p.PlayerName); // Filter out empties
+
+                populateLoginDropdown();
+            } catch (e) {
+                console.error("Failed to fetch player sheet:", e);
+            }
         }
 
-        function copyJoinLink() {
-            let encodedCode = btoa(state.scriptUrl.match(/\/s\/([a-zA-Z0-9_-]+)\//)?.[1] || state.scriptUrl);
-            navigator.clipboard.writeText(window.location.href.split('?')[0] + "?j=" + encodedCode); notify("Join Link copied!");
-        }
-        function copyScriptCode() { navigator.clipboard.writeText(document.getElementById('app-script-code').innerText); notify("Script Copied!"); }
-
-        // --- EDIT MODAL LOGIC ---
-        function openNPCModal(id = null) {
-            const npc = state.npcs.find(n => n.id === id) || { name: '', hometown: '', description: '', secret: '', isTravelling: false };
-            const fields = document.getElementById('modal-fields');
-            document.getElementById('modal-title').innerText = id ? "Edit NPC" : "Add NPC";
-            fields.innerHTML = `
-                <input type="text" id="f-name" placeholder="NPC Name" value="${npc.name}">
-                <input type="text" id="f-hometown" placeholder="Hometown" value="${npc.hometown}">
-                <textarea id="f-desc" placeholder="Public Description" style="height:80px;">${npc.description}</textarea>
-                <textarea id="f-secret" placeholder="Secret (DM/Owner Only)" style="height:60px;">${npc.secret}</textarea>
-                <div style="margin-top:10px;">
-                    <button type="button" id="f-travel-btn" class="toggle-btn ${npc.isTravelling ? 'active' : ''}" 
-                        onclick="this.classList.toggle('active'); this.innerText = this.classList.contains('active') ? 'Travelling: YES' : 'Travelling: NO';">
-                        ${npc.isTravelling ? 'Travelling: YES' : 'Travelling: NO'}
-                    </button>
-                </div>
-            `;
-            document.getElementById('edit-modal').dataset.type = 'npc';
-            document.getElementById('edit-modal').dataset.id = id;
-            document.getElementById('edit-modal').style.display = 'flex';
+        function populateLoginDropdown() {
+            const select = document.getElementById('login-player-select');
+            select.innerHTML = '<option value="">Select Player...</option>';
+            state.playersFromSheet.forEach(p => {
+                select.innerHTML += `<option value="${p.PlayerName}">${p.PlayerName} (${p.CharacterName})</option>`;
+            });
         }
 
-        function openPCModal(id) {
-            const pc = state.pcs.find(p => p.id === id);
-            const fields = document.getElementById('modal-fields');
-            document.getElementById('modal-title').innerText = `Edit ${pc.character}`;
+        function openLoginModal() {
+            document.getElementById('login-modal').style.display = 'flex';
+            document.getElementById('login-pin').value = '';
+        }
+
+        function attemptLogin() {
+            const playerName = document.getElementById('login-player-select').value;
+            const pin = document.getElementById('login-pin').value;
             
-            let statusGrid = STATUS_OPTIONS.map(s => `
-                <button type="button" class="toggle-btn status-btn ${(pc.statuses || []).includes(s) ? 'active-status' : ''}" 
-                    style="width: 31%; margin:1%; font-size:10px;" value="${s}" 
-                    onclick="this.classList.toggle('active-status')">${s}</button>
-            `).join('');
-
-            fields.innerHTML = `
-                <input type="text" id="f-tagline" placeholder="Current Action/Tagline" value="${pc.tagline || ''}">
-                <textarea id="f-desc" placeholder="Character Description" style="height:80px;">${pc.description}</textarea>
-                <textarea id="f-secret" placeholder="Personal Plot Hooks (DM/Owner Only)" style="height:60px;">${pc.secret}</textarea>
-                <div style="margin-top:10px; border-top:1px solid #444; padding-top:10px;">
-                    <span class="meta" style="display:block; margin-bottom:5px;">Toggle Status Flags:</span>
-                    <div style="display:flex; flex-wrap:wrap;">${statusGrid}</div>
-                </div>
-            `;
-            document.getElementById('edit-modal').dataset.type = 'pc';
-            document.getElementById('edit-modal').dataset.id = id;
-            document.getElementById('edit-modal').style.display = 'flex';
-        }
-
-        function saveEntry() {
-            const m = document.getElementById('edit-modal');
-            const id = m.dataset.id;
-            const type = m.dataset.type;
-
-            if (type === 'npc') {
-                const isTravelling = document.getElementById('f-travel-btn').classList.contains('active');
-                const data = {
-                    id: id || Date.now().toString(),
-                    name: document.getElementById('f-name').value,
-                    hometown: document.getElementById('f-hometown').value,
-                    description: document.getElementById('f-desc').value,
-                    secret: document.getElementById('f-secret').value,
-                    isTravelling: isTravelling,
-                    createdBy: id ? state.npcs.find(n => n.id === id).createdBy : (state.currentUser || 'DM')
-                };
-                if (id) { const i = state.npcs.findIndex(n => n.id === id); state.npcs[i] = data; }
-                else state.npcs.push(data);
+            if (!playerName) return alert("Select a player!");
+            
+            const playerRec = state.playersFromSheet.find(p => p.PlayerName === playerName);
+            if (playerRec && playerRec.PIN === pin) {
+                state.currentUser = playerRec.PlayerName;
+                state.currentCharacter = playerRec.CharacterName;
+                state.isDM = false;
+                updateLoginUI();
+                closeModal('login-modal');
+                renderAll();
             } else {
-                const pc = state.pcs.find(p => p.id === id);
-                pc.tagline = document.getElementById('f-tagline').value;
-                pc.description = document.getElementById('f-desc').value;
-                pc.secret = document.getElementById('f-secret').value;
-                pc.statuses = Array.from(document.querySelectorAll('.status-btn.active-status')).map(el => el.value);
+                alert("Incorrect PIN.");
+            }
+        }
+
+        function loginAsDM() {
+            state.currentUser = "DM";
+            state.currentCharacter = null;
+            state.isDM = true;
+            updateLoginUI();
+            closeModal('login-modal');
+            renderAll();
+        }
+
+        function updateLoginUI() {
+            const btn = document.getElementById('login-btn');
+            if (state.isDM) {
+                btn.innerText = "Logged in: DM";
+                btn.style.background = "#9b59b6";
+                btn.style.color = "white";
+            } else {
+                btn.innerText = `Logged in: ${state.currentUser}`;
+                btn.style.background = "#2ecc71";
+            }
+        }
+
+        // --- RENDER LOGIC ---
+        function renderAll() {
+            const grid = document.getElementById('npc-grid');
+            const selectedHometown = document.getElementById('hometown-filter').value;
+            grid.innerHTML = '';
+
+            // 1. Calculate Priority and Sort
+            const displayList = [...state.entities].sort((a, b) => {
+                // If combat mode, sort strictly by Initiative
+                if (state.combatMode) {
+                    return (b.initiative || 0) - (a.initiative || 0);
+                }
+                
+                // Normal Sorting
+                const getPriority = (ent) => {
+                    if (ent.isTravelling) return 4; // Ultimate (Party/Travelling)
+                    if (ent.isPC) return 3; // PCs slightly higher than normal NPCs
+                    if (ent.hometown === selectedHometown) return 2; // Penultimate (Hometown)
+                    return 1; // Standard
+                };
+                return getPriority(b) - getPriority(a) || a.name.localeCompare(b.name);
+            });
+
+            // 2. Build Cards
+            displayList.forEach(ent => {
+                const isOwner = (state.currentUser === ent.createdBy) || (state.currentCharacter && ent.name === state.currentCharacter);
+                const canSeeSecret = state.isDM || isOwner;
+                const isDead = ent.statuses && ent.statuses.includes("Dead");
+                
+                let classes = ['npc-card'];
+                if (ent.isPC) classes.push('pc');
+                if (ent.isTravelling) classes.push('travelling');
+                if (ent.hometown === selectedHometown && !state.combatMode) classes.push('hometown-focus');
+                if (isDead) classes.push('dead');
+
+                const card = document.createElement('div');
+                card.className = classes.join(' ');
+                
+                // Status Pills
+                let statusHTML = '';
+                if (ent.statuses && ent.statuses.length > 0) {
+                    statusHTML = `<div class="status-container">` + 
+                        ent.statuses.map(s => {
+                            let pClass = s.includes("Revived") ? 'status-pill revived' : 'status-pill';
+                            return `<span class="${pClass}">${s}</span>`;
+                        }).join('') + `</div>`;
+                }
+
+                // Initiative Box (Only in Combat Mode)
+                let initBoxHTML = '';
+                if (state.combatMode) {
+                    const disabled = state.isDM || isOwner ? '' : 'disabled';
+                    initBoxHTML = `
+                        <div class="init-box">
+                            <span style="font-size:12px; font-weight:bold; color:#e74c3c;">INIT:</span>
+                            <input type="number" value="${ent.initiative || 0}" 
+                                onchange="updateInitiative('${ent.id}', this.value)" ${disabled}>
+                        </div>
+                    `;
+                }
+                
+                card.innerHTML = `
+                    <div class="card-content">
+                        <div class="npc-meta">
+                            ${ent.hometown || 'Unknown Origin'}
+                            ${ent.isPC ? '<span class="badge badge-pc">PC</span>' : ''}
+                            ${ent.isTravelling ? '<span class="badge badge-travelling">TRAVELLING</span>' : ''}
+                        </div>
+                        <h3 class="npc-name">${ent.name}</h3>
+                        ${ent.tagline ? `<div class="npc-tagline">"${ent.tagline}"</div>` : ''}
+                        
+                        ${statusHTML}
+                        ${initBoxHTML}
+                        
+                        <div class="description-box">${ent.description}</div>
+                        ${canSeeSecret ? `<div class="secret-box"><strong>Secret:</strong> ${ent.secret || 'None'}</div>` : ''}
+                        
+                        <div style="margin-top: 10px; display: flex; gap: 5px;">
+                            ${(state.isDM || isOwner) ? `<button onclick="editEntity('${ent.id}')" style="font-size:11px; background:#444; color:white; padding: 5px 10px;">Edit Data</button>` : ''}
+                        </div>
+                    </div>
+                `;
+                grid.appendChild(card);
+            });
+        }
+
+        // --- GAME MECHANICS ---
+        function toggleCombat() {
+            state.combatMode = !state.combatMode;
+            const btn = document.getElementById('combat-toggle-btn');
+            if (state.combatMode) {
+                btn.classList.add('active');
+                btn.innerText = "🛑 End Combat";
+            } else {
+                btn.classList.remove('active');
+                btn.innerText = "⚔️ Toggle Combat";
+                // Clear initiative on end combat
+                state.entities.forEach(e => e.initiative = 0);
+                saveDatabase();
+            }
+            renderAll();
+        }
+
+        function updateInitiative(id, val) {
+            const ent = state.entities.find(e => e.id === id);
+            if (ent) {
+                ent.initiative = parseInt(val) || 0;
+                saveDatabase();
+                renderAll(); // Re-sort
+            }
+        }
+
+        function triggerLongRest() {
+            if (!confirm("Trigger a Long Rest? This will clear temporary statuses and progress Revived statuses.")) return;
+            
+            const tempStatuses = ["Blinded", "Charmed", "Deafened", "Frightened", "Grappled", "Incapacitated", "Invisible", "Paralyzed", "Petrified", "Poisoned", "Prone", "Restrained", "Stunned", "Unconscious"];
+            
+            state.entities.forEach(ent => {
+                if (!ent.statuses) ent.statuses = [];
+                
+                // Clear temps
+                ent.statuses = ent.statuses.filter(s => !tempStatuses.includes(s));
+                
+                // Progress Revived
+                if (ent.statuses.includes("Revived -3")) {
+                    ent.statuses = ent.statuses.filter(s => s !== "Revived -3");
+                    ent.statuses.push("Revived -2");
+                } else if (ent.statuses.includes("Revived -2")) {
+                    ent.statuses = ent.statuses.filter(s => s !== "Revived -2");
+                    ent.statuses.push("Revived -1");
+                } else if (ent.statuses.includes("Revived -1")) {
+                    ent.statuses = ent.statuses.filter(s => s !== "Revived -1");
+                }
+            });
+            
+            saveDatabase();
+            renderAll();
+            alert("Long Rest completed. Statuses updated.");
+        }
+
+        // --- ADD/EDIT LOGIC ---
+        function openAddModal() {
+            document.getElementById('modal-title').innerText = "Add New Character";
+            resetForm();
+            document.getElementById('npc-modal').style.display = 'flex';
+        }
+
+        function editEntity(id) {
+            const ent = state.entities.find(e => e.id === id);
+            document.getElementById('f-isPC').checked = ent.isPC || false;
+            document.getElementById('f-name').value = ent.name;
+            document.getElementById('f-tagline').value = ent.tagline || '';
+            document.getElementById('f-hometown').value = ent.hometown;
+            document.getElementById('f-description').value = ent.description;
+            document.getElementById('f-secret').value = ent.secret || '';
+            document.getElementById('f-travelling').checked = ent.isTravelling;
+            
+            // Check statuses
+            document.querySelectorAll('.status-cb').forEach(cb => {
+                cb.checked = ent.statuses && ent.statuses.includes(cb.value);
+            });
+
+            document.getElementById('npc-modal').dataset.editId = id;
+            document.getElementById('modal-title').innerText = "Edit Character";
+            document.getElementById('npc-modal').style.display = 'flex';
+        }
+
+        function saveEntity() {
+            const id = document.getElementById('npc-modal').dataset.editId || Date.now().toString();
+            
+            // Gather Statuses
+            const activeStatuses = Array.from(document.querySelectorAll('.status-cb:checked')).map(cb => cb.value);
+
+            const ent = {
+                id,
+                isPC: document.getElementById('f-isPC').checked,
+                name: document.getElementById('f-name').value,
+                tagline: document.getElementById('f-tagline').value,
+                hometown: document.getElementById('f-hometown').value,
+                description: document.getElementById('f-description').value,
+                secret: document.getElementById('f-secret').value,
+                isTravelling: document.getElementById('f-travelling').checked,
+                statuses: activeStatuses,
+                initiative: 0,
+                createdBy: state.entities.find(e => e.id === id)?.createdBy || (state.currentUser || "DM")
+            };
+
+            const idx = state.entities.findIndex(n => n.id === id);
+            if(idx > -1) {
+                // Preserve initiative if editing during combat
+                ent.initiative = state.entities[idx].initiative;
+                state.entities[idx] = ent;
+            } else {
+                state.entities.push(ent);
             }
 
-            if(state.scriptUrl) triggerAutoSave();
-            else { localStorage.setItem('npcs', JSON.stringify(state.npcs)); localStorage.setItem('pcs', JSON.stringify(state.pcs)); }
-            
-            renderAll(); closeModal('edit-modal');
+            saveDatabase();
+            closeModal('npc-modal');
+            renderAll();
         }
 
-        function closeModal(id) { document.getElementById(id).style.display = 'none'; }
-
-        // --- INITIATIVE & COMBAT ---
-        function toggleInitiative() { state.showInitiative = !state.showInitiative; renderAll(); }
-        function addToInit(name) {
-            const score = prompt(`Enter initiative for ${name}:`, "10");
-            if (score !== null) { state.initiativeOrder.push({ name, score: parseInt(score) || 0 }); renderAll(); }
-        }
-        function nextTurn() { state.initIndex = (state.initIndex + 1) % state.initiativeOrder.length; renderAll(); }
-        function prevTurn() { state.initIndex = (state.initIndex - 1 + state.initiativeOrder.length) % state.initiativeOrder.length; renderAll(); }
-        function clearInit() { if(confirm("Clear combat?")) { state.initiativeOrder = []; state.initIndex = 0; renderAll(); }}
-        function removeFromInit(i) { state.initiativeOrder.splice(i, 1); renderAll(); }
-
-        // --- CAMPAIGN UTILS ---
-        function performLongRest() {
-            if(!confirm("End the day? Most statuses will clear, and 'Revived' penalties will decrease.")) return;
-
-            state.pcs.forEach(pc => {
-                pc.statuses = (pc.statuses || []).map(s => {
-                    if (s === "Revived -3") return "Revived -2";
-                    if (s === "Revived -2") return "Revived -1";
-                    if (s === "Revived -1") return null;
-                    if (["Dead", "Unconscious", "Petrified"].includes(s)) return s;
-                    return null;
-                }).filter(s => s !== null);
-            });
-
-            if(state.scriptUrl) triggerAutoSave();
-            else localStorage.setItem('pcs', JSON.stringify(state.pcs));
-            
-            renderAll(); notify("Long Rest Complete. Recovery progressed.");
-        }
-
+        // --- EXPORT LOGIC ---
         function exportSessionLog() {
-            let log = `CAMPAIGN LOG: ${new Date().toLocaleDateString()}\n`;
-            log += `==========================================\n\n`;
-
-            log += `PARTY STATUS:\n`;
-            state.pcs.filter(p => p.character !== 'DM').forEach(pc => {
-                const statusStr = (pc.statuses || []).length ? `[${pc.statuses.join(', ').toUpperCase()}] ` : '';
-                const taglineStr = pc.tagline ? `[${pc.tagline.toUpperCase()}] ` : '';
-                log += `${pc.character.padEnd(12)}: ${statusStr}${taglineStr}${pc.description}\n`;
+            let log = `WEEKLY GAME SESSION LOG\n========================\n\n`;
+            
+            log += `ACTIVE PARTY & COMPANIONS:\n`;
+            state.entities.filter(n => n.isTravelling || n.isPC).forEach(n => {
+                const tagStr = n.tagline ? ` [${n.tagline}]` : '';
+                const statusStr = (n.statuses && n.statuses.length > 0) ? ` {Status: ${n.statuses.join(', ')}}` : '';
+                log += `- ${n.name}${tagStr}${statusStr}\n  Hometown: ${n.hometown}\n  ${n.description}\n\n`;
             });
 
-            log += `\nACTIVE COMPANIONS:\n`;
-            state.npcs.filter(n => n.isTravelling).forEach(n => { log += `- ${n.name} (${n.hometown}): ${n.description}\n`; });
-
-            log += `\nLOCAL NOTABLES (${document.getElementById('hometown-focus').value || 'All'}):\n`;
-            const focus = document.getElementById('hometown-focus').value;
-            state.npcs.filter(n => !n.isTravelling && (focus === "" || n.hometown === focus)).forEach(n => {
-                log += `- ${n.name}: ${n.description}\n`;
+            log += `OTHER NOTABLE NPCS:\n`;
+            state.entities.filter(n => !n.isTravelling && !n.isPC).forEach(n => {
+                const tagStr = n.tagline ? ` [${n.tagline}]` : '';
+                log += `- ${n.name}${tagStr}: ${n.description}\n`;
             });
 
-            const blob = new Blob([log], {type: 'text/plain'});
-            const a = document.createElement('a');
-            a.href = window.URL.createObjectURL(blob); a.download = 'SessionLog.txt'; a.click();
-            notify("Log exported to text file.");
+            // Copy to Keyboard/Clipboard
+            navigator.clipboard.writeText(log).then(() => {
+                alert("Session log copied to your clipboard successfully!");
+            }).catch(err => {
+                console.error("Failed to copy text: ", err);
+                alert("Could not copy to clipboard. Check browser permissions.");
+            });
         }
+
+        // --- UTILS ---
+        function closeModal(id) { 
+            document.getElementById(id).style.display = 'none'; 
+        }
+        
+        function resetForm() {
+            document.getElementById('f-isPC').checked = false;
+            document.getElementById('f-name').value = '';
+            document.getElementById('f-tagline').value = '';
+            document.getElementById('f-hometown').value = '';
+            document.getElementById('f-description').value = '';
+            document.getElementById('f-secret').value = '';
+            document.getElementById('f-travelling').checked = false;
+            document.querySelectorAll('.status-cb').forEach(cb => cb.checked = false);
+            delete document.getElementById('npc-modal').dataset.editId;
+        }
+
+        // Run
+        init();
     </script>
 </body>
 </html>
