@@ -16,6 +16,30 @@
         .grid-view { padding: 30px; display: grid; gap: 20px; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); }
         .table-container { padding: 30px; overflow-x: auto; }
         
+        /* Privacy Ribbon */
+        .privacy-ribbon {
+            width: 150px;
+            background: #e74c3c;
+            position: fixed;
+            bottom: 25px;
+            left: -35px;
+            text-align: center;
+            line-height: 28px;
+            color: #fff;
+            transform: rotate(45deg);
+            box-shadow: 0 0 10px rgba(0,0,0,0.5);
+            z-index: 9999;
+            text-decoration: none;
+            font-size: 11px;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            transition: background 0.2s;
+        }
+        .privacy-ribbon:hover {
+            background: #c0392b;
+        }
+        
         /* Card Styles */
         .npc-card { background: #2a2a35; border-radius: 10px; border: 1px solid #444; position: relative; display: flex; flex-direction: column; overflow: hidden; transition: transform 0.2s; }
         .npc-card.pc { border: 2px solid #f1c40f; box-shadow: 0 0 10px rgba(241, 196, 15, 0.2); }
@@ -42,15 +66,13 @@
         .badge { padding: 2px 6px; border-radius: 4px; font-size: 10px; margin-left: 5px; vertical-align: middle; font-weight: bold; color: #000; }
         .badge-pc { background: #f1c40f; }
         .badge-travelling { background: #2ecc71; }
-        .badge-temp { background: #e67e22; color: white; }
         .status-container { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 10px; }
         .status-pill { background: #e74c3c; color: white; padding: 3px 8px; border-radius: 12px; font-size: 11px; font-weight: bold; white-space: nowrap; }
         .status-pill.revived { background: #e67e22; }
-        .status-pill.exhausted { background: #8e44ad; }
         
         /* Forms & Inputs */
-        input, select, textarea { width: 100%; padding: 8px; margin: 5px 0; border-radius: 4px; border: 1px solid #444; background: #1a1a20; color: white; box-sizing: border-box; font-family: inherit; }
-        .checkbox-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; background: #1a1a20; padding: 10px; border-radius: 4px; border: 1px solid #444; max-height: 200px; overflow-y: auto; }
+        input, select, textarea { width: 100%; padding: 8px; margin: 5px 0; border-radius: 4px; border: 1px solid #444; background: #1a1a20; color: white; box-sizing: border-box; }
+        .checkbox-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; background: #1a1a20; padding: 10px; border-radius: 4px; border: 1px solid #444; max-height: 150px; overflow-y: auto; }
         .checkbox-grid label { font-size: 12px; display: flex; align-items: center; gap: 5px; cursor: pointer; }
         .checkbox-grid input[type="checkbox"] { width: auto; margin: 0; }
 
@@ -69,7 +91,6 @@
         button.cloud-btn { background: #2c3e50; color: white; border: 1px solid #555; }
         button.cloud-btn.pull { background: #1abc9c; border: none; }
         button.view-btn { background: #45b7d1; color: #111; }
-        button.session-btn { background: #d35400; color: white; }
         
         /* Login States */
         button.login-btn { background: #f39c12; color: #111; }
@@ -81,21 +102,13 @@
         .init-box input { width: 60px; margin: 0; text-align: center; font-weight: bold; font-size: 16px; }
         
         /* Modals */
-        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 1000; display: none; justify-content: center; align-items: center; backdrop-filter: blur(3px); }
-        .modal-box { background: #2a2a35; padding: 25px; border-radius: 8px; width: 90%; max-width: 600px; max-height: 90vh; overflow-y: auto; position: relative; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 1000; display: none; justify-content: center; align-items: center; }
+        .modal-box { background: #2a2a35; padding: 25px; border-radius: 8px; width: 90%; max-width: 600px; max-height: 90vh; overflow-y: auto; position: relative; }
         
         /* Setup Instructions Specifics */
         .instructions-box { background: #1a1a20; padding: 15px; border-radius: 6px; border: 1px solid #444; font-size: 13px; line-height: 1.5; margin: 15px 0; color: #bdc3c7; max-height: 400px; overflow-y: auto; }
         .instructions-box h3 { color: #f1c40f; margin-top: 0; }
         .error-text { color: #e74c3c; font-weight: bold; margin-bottom: 15px; display: none; background: #4a1919; padding: 10px; border-radius: 4px; border: 1px solid #e74c3c; }
-
-        /* Toast Notifications */
-        #toast-container { position: fixed; bottom: 30px; right: 30px; z-index: 9999; display: flex; flex-direction: column; gap: 10px; pointer-events: none; }
-        .toast { background: #2a2a35; border-left: 5px solid #3498db; color: white; padding: 15px 25px; border-radius: 6px; box-shadow: 0 5px 15px rgba(0,0,0,0.4); font-size: 14px; font-weight: 500; animation: slideIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; opacity: 1; transition: opacity 0.3s; display: flex; align-items: center; gap: 10px; }
-        .toast.success { border-color: #2ecc71; }
-        .toast.error { border-color: #e74c3c; }
-        .toast.info { border-color: #3498db; }
-        @keyframes slideIn { from { transform: translateX(120%); } to { transform: translateX(0); } }
 
         /* Header Specifics */
         .header-left { display: flex; align-items: center; gap: 15px; }
@@ -105,7 +118,7 @@
 </head>
 <body>
 
-    <div id="toast-container"></div>
+    <a href="privacy.html" target="_blank" class="privacy-ribbon" title="View Privacy Policy">Privacy</a>
 
     <header>
         <div class="header-left">
@@ -120,14 +133,10 @@
             </select>
             <button class="view-btn" onclick="toggleView()">🗂️ Toggle View</button>
             <button class="combat-btn" id="combat-toggle-btn" onclick="toggleCombat()">⚔️ Toggle Combat</button>
-            <button class="add-btn" id="add-combatant-btn" onclick="openCombatantModal()" style="display:none; background:#e67e22; color:white;">+ Add Combatant</button>
-            <button class="add-btn" id="unhide-combat-btn" onclick="unhideAllCombat()" style="display:none; background:#f39c12; color:#111;">👁️ Unhide All</button>
             <button class="rest-btn" onclick="triggerLongRest()">🏕️ Long Rest</button>
             
-            <button class="session-btn" onclick="exportStartOfGame()">📜 Start of Game Summary</button>
-            
             <button class="cloud-btn pull" onclick="pullFromCloud()">☁️ Pull Data</button>
-            <button class="cloud-btn" onclick="syncToCloud()">☁️ Force Sync</button>
+            <button class="cloud-btn" onclick="syncToCloud()">☁️ Save to Cloud</button>
             
             <button class="add-btn" onclick="openAddModal()">+ New PC/NPC</button>
             
@@ -142,41 +151,6 @@
 
     <main id="npc-grid" class="grid-view"></main>
 
-    <div id="confirm-modal" class="modal-overlay">
-        <div class="modal-box" style="max-width: 400px; text-align: center;">
-            <h2 id="confirm-title" style="margin-top: 0; color: #f1c40f;">Are you sure?</h2>
-            <p id="confirm-msg" style="font-size: 15px; color: #ccc; line-height: 1.4;"></p>
-            <div style="display:flex; gap: 10px; margin-top: 25px;">
-                <button id="confirm-yes-btn" class="add-btn" style="flex:1; height: 40px; font-size: 16px;">Yes, Proceed</button>
-                <button onclick="closeModal('confirm-modal')" style="background:#555; color:white; flex:1; height: 40px; font-size: 16px; border:none; border-radius:4px; cursor:pointer;">Cancel</button>
-            </div>
-        </div>
-    </div>
-
-    <div id="prompt-modal" class="modal-overlay">
-        <div class="modal-box" style="max-width: 300px; text-align: center;">
-            <h2 style="margin-top: 0; color: #9b59b6;">👑 DM Elevation</h2>
-            <p style="font-size: 13px; color: #ccc; margin-bottom: 20px;">Please enter your PIN again to verify DM access.</p>
-            <input type="password" id="prompt-pin-input" placeholder="Enter PIN" style="text-align: center; font-size: 18px; letter-spacing: 2px;">
-            <div style="display:flex; gap: 10px; margin-top: 20px;">
-                <button id="prompt-submit-btn" class="elevate-btn" style="flex:1; display:block; height: 40px;">Verify</button>
-                <button onclick="closeModal('prompt-modal')" style="background:#555; color:white; flex:1; height: 40px; border:none; border-radius:4px; cursor:pointer;">Cancel</button>
-            </div>
-        </div>
-    </div>
-
-    <div id="combatant-modal" class="modal-overlay">
-        <div class="modal-box" style="max-width: 300px;">
-            <h2 style="margin-top: 0;">Add Combatant</h2>
-            <input type="text" id="c-name" placeholder="Name (e.g. Goblin 1)">
-            <input type="number" id="c-init" placeholder="Initiative" value="0">
-            <div style="display:flex; gap: 10px; margin-top: 15px;">
-                <button onclick="saveCombatant()" class="add-btn" style="flex:1; height: 40px;">Add</button>
-                <button onclick="closeModal('combatant-modal')" style="background:#555; color:white; flex:1; height: 40px; border:none; border-radius:4px; cursor:pointer;">Cancel</button>
-            </div>
-        </div>
-    </div>
-
     <div id="npc-modal" class="modal-overlay">
         <div class="modal-box">
             <h2 id="modal-title">Add PC/NPC</h2>
@@ -187,7 +161,7 @@
 
             <input type="text" id="f-name" placeholder="Name">
             <input type="text" id="f-tagline" placeholder="Tagline (e.g. 'The brooding rogue')">
-            <input type="text" id="f-hometown" placeholder="Hometown (Adds to dropdown filter)">
+            <input type="text" id="f-hometown" placeholder="Hometown (or select from list)">
             <textarea id="f-description" placeholder="Public Description"></textarea>
             <textarea id="f-secret" placeholder="Secret (DM/Owner Only)"></textarea>
             
@@ -208,15 +182,15 @@
 
     <div id="login-modal" class="modal-overlay">
         <div class="modal-box" style="max-width: 300px;">
-            <h2 style="margin-top: 0; color: #f39c12;">Player Login</h2>
+            <h2>Player Login</h2>
             <select id="login-player-select">
                 <option value="">Select Player...</option>
                 </select>
             <input type="password" id="login-pin" placeholder="Enter PIN">
-            <div style="display:flex; gap: 10px; margin-top: 20px;">
-                <button onclick="attemptLogin()" class="login-btn" style="flex:1; height: 40px;">Login</button>
-                <button onclick="closeModal('login-modal')" style="background:#555; color:white; flex:1; height: 40px; border:none; border-radius:4px;">Cancel</button>
+            <div style="display:flex; gap: 10px; margin-top: 15px;">
+                <button onclick="attemptLogin()" class="login-btn" style="flex:1;">Login</button>
             </div>
+            <button onclick="closeModal('login-modal')" style="width: 100%; margin-top: 10px; background:#555; color:white; padding: 8px;">Cancel</button>
         </div>
     </div>
 
@@ -236,14 +210,9 @@
                     <button onclick="applyGasUrl()" class="add-btn" style="width: 100%; margin-top: 10px; height: 40px;">Connect & Load Database</button>
                 </div>
                 
-                <div id="qr-section" style="display: none; text-align: center; background: #1a1a20; padding: 15px; border-radius: 6px; border: 1px solid #444; min-width: 110px;">
+                <div id="qr-section" style="display: none; text-align: center; background: #1a1a20; padding: 15px; border-radius: 6px; border: 1px solid #444;">
                     <div id="share-qrcode" style="background: white; padding: 5px; display: inline-block; margin-bottom: 5px; border-radius: 4px;"></div>
                     <div style="font-size: 11px; color: #bdc3c7; font-weight: bold; text-transform: uppercase;">Scan to Join</div>
-                    <div style="margin-top: 10px;">
-                        <button onclick="copyDiscordLink()" id="discord-copy-btn" style="background: #5865F2; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 11px; font-weight: bold; width: 100%;">
-                            🔗 Copy Link
-                        </button>
-                    </div>
                 </div>
             </div>
 
@@ -256,7 +225,6 @@
                             <li>Create a new Google Sheet.</li>
                             <li>Add two tabs at the bottom. Name the first one <strong>NPCs</strong> and the second one <strong>PCs</strong>.</li>
                             <li>In the <strong>PCs</strong> sheet, type <code>PlayerName</code>, <code>CharacterName</code>, and <code>PIN</code> as column headers to create player logins.</li>
-                            <li><strong style="color:#e74c3c;">IMPORTANT:</strong> Select the entire <code>PIN</code> column, click <strong>Format &gt; Number &gt; Plain Text</strong>. This ensures PINs with leading zeros (e.g. '0012') are preserved properly!</li>
                         </ul>
                     </li>
                     <li style="margin-top: 10px;"><strong>Add the Code:</strong>
@@ -378,12 +346,12 @@ function doPost(e) {
         // --- CONSTANTS & DATA ---
         let GAS_WEB_APP_URL = null; 
         
+        const HOMETOWNS = ["Solomani Rim", "Terra", "Vanejen", "Spinward Marches", "Waterdeep", "Neverwinter", "Baldur's Gate"];
         const STATUSES = [
             "Blinded", "Charmed", "Deafened", "Frightened", "Grappled", 
             "Incapacitated", "Invisible", "Paralyzed", "Petrified", "Poisoned", 
-            "Prone", "Restrained", "Stunned", "Unconscious", "Dead", 
-            "Exhausted -6", "Exhausted -5", "Exhausted -4", "Exhausted -3", "Exhausted -2", "Exhausted -1",
-            "Revived -4", "Revived -3", "Revived -2", "Revived -1"
+            "Prone", "Restrained", "Stunned", "Unconscious", "Exhaustion", 
+            "Dead", "Revived -3", "Revived -2", "Revived -1"
         ];
 
         // --- STATE MANAGEMENT ---
@@ -398,94 +366,24 @@ function doPost(e) {
             viewMode: 'grid' 
         };
 
-        // --- CUSTOM NOTIFICATIONS & MODALS ---
-        function showToast(message, type = 'success') {
-            const container = document.getElementById('toast-container');
-            const toast = document.createElement('div');
-            toast.className = `toast ${type}`;
-            
-            let icon = '✅';
-            if (type === 'error') icon = '❌';
-            if (type === 'info') icon = 'ℹ️';
-            
-            toast.innerHTML = `<span>${icon}</span> <span>${message}</span>`;
-            container.appendChild(toast);
-            
-            setTimeout(() => {
-                toast.style.opacity = '0';
-                setTimeout(() => toast.remove(), 300);
-            }, 3000);
-        }
-
-        function showConfirm(title, message, onConfirmCallback) {
-            document.getElementById('confirm-title').innerText = title;
-            document.getElementById('confirm-msg').innerText = message;
-            document.getElementById('confirm-modal').style.display = 'flex';
-            
-            const yesBtn = document.getElementById('confirm-yes-btn');
-            const newYesBtn = yesBtn.cloneNode(true);
-            yesBtn.parentNode.replaceChild(newYesBtn, yesBtn);
-            
-            newYesBtn.onclick = () => {
-                closeModal('confirm-modal');
-                onConfirmCallback();
-            };
-        }
-
-        function showPromptModal(onSubmitCallback) {
-            const input = document.getElementById('prompt-pin-input');
-            input.value = '';
-            document.getElementById('prompt-modal').style.display = 'flex';
-            input.focus();
-            
-            const submitBtn = document.getElementById('prompt-submit-btn');
-            const newSubmitBtn = submitBtn.cloneNode(true);
-            submitBtn.parentNode.replaceChild(newSubmitBtn, submitBtn);
-            
-            newSubmitBtn.onclick = () => {
-                closeModal('prompt-modal');
-                onSubmitCallback(document.getElementById('prompt-pin-input').value);
-            };
-        }
-
-        // --- URL COMPRESSION & OBFUSCATION ---
-        function encodeGasUrl(url) {
-            try {
-                let match = url.match(/\/s\/([^/]+)\/exec/);
-                let payload = match ? "ID|" + match[1] : "URL|" + url;
-                return btoa(payload).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-            } catch(e) { return ""; }
-        }
-
-        function decodeGasUrl(encoded) {
-            try {
-                let str = encoded.replace(/-/g, '+').replace(/_/g, '/');
-                while (str.length % 4) str += '=';
-                let decoded = atob(str);
-                
-                if (decoded.startsWith("ID|")) {
-                    return "https://script.google.com/macros/s/" + decoded.substring(3) + "/exec";
-                } else if (decoded.startsWith("URL|")) {
-                    return decoded.substring(4);
-                }
-                return null;
-            } catch(e) { return null; }
-        }
-
         // --- INIT & SETUP LOGIC ---
         function init() {
             const urlParams = new URLSearchParams(window.location.search);
-            const dbParam = urlParams.get('db'); 
+            const gasParam = urlParams.get('gas');
             
-            if (dbParam) {
-                const decodedUrl = decodeGasUrl(dbParam);
-                if(decodedUrl) {
-                    sessionStorage.setItem('GAS_WEB_APP_URL', decodedUrl);
-                }
+            if (gasParam) {
+                sessionStorage.setItem('GAS_WEB_APP_URL', gasParam);
                 window.history.replaceState({}, document.title, window.location.pathname);
             }
 
             GAS_WEB_APP_URL = sessionStorage.getItem('GAS_WEB_APP_URL');
+
+            const filter = document.getElementById('hometown-filter');
+            HOMETOWNS.forEach(h => {
+                const opt = document.createElement('option');
+                opt.value = h; opt.innerText = h;
+                filter.appendChild(opt);
+            });
 
             const statusGrid = document.getElementById('status-grid');
             STATUSES.forEach(s => {
@@ -497,26 +395,12 @@ function doPost(e) {
             updateConnectionUI();
 
             if (GAS_WEB_APP_URL) {
-                fetchCloudData(true, true); // Silent pull on load
+                fetchCloudData(false);
             } else {
                 openSetupModal();
-                renderAll();
             }
-        }
 
-        function updateHometownDropdown() {
-            const filter = document.getElementById('hometown-filter');
-            const currentVal = filter.value;
-            filter.innerHTML = '<option value="">Sort by Hometown...</option>';
-            
-            const uniqueHometowns = [...new Set(state.entities.map(e => e.hometown).filter(h => h && h.trim() !== ''))].sort();
-            
-            uniqueHometowns.forEach(h => {
-                const opt = document.createElement('option');
-                opt.value = h; opt.innerText = h;
-                filter.appendChild(opt);
-            });
-            filter.value = currentVal; 
+            renderAll();
         }
 
         function updateConnectionUI() {
@@ -565,7 +449,7 @@ function doPost(e) {
                 updateConnectionUI();
                 
                 window.history.replaceState({}, document.title, window.location.pathname);
-                showToast("Disconnected from Cloud Database. Working locally.", "info");
+                alert("Disconnected from Cloud Database. Working locally.");
             }
         }
 
@@ -593,10 +477,7 @@ function doPost(e) {
 
         function applyGasUrl() {
             const url = document.getElementById('setup-gas-url').value.trim();
-            if (!url) {
-                showToast("Please enter a valid URL.", "error");
-                return;
-            }
+            if (!url) return alert("Please enter a valid URL.");
             
             sessionStorage.setItem('GAS_WEB_APP_URL', url);
             GAS_WEB_APP_URL = url;
@@ -606,7 +487,7 @@ function doPost(e) {
             generateShareQRCode();
             updateConnectionUI();
             
-            fetchCloudData(true, false);
+            fetchCloudData(true);
         }
 
         function generateShareQRCode() {
@@ -614,7 +495,7 @@ function doPost(e) {
             qrContainer.innerHTML = ''; 
             if (!GAS_WEB_APP_URL) return;
 
-            const shareableUrl = window.location.origin + window.location.pathname + "?db=" + encodeGasUrl(GAS_WEB_APP_URL);
+            const shareableUrl = window.location.origin + window.location.pathname + "?gas=" + encodeURIComponent(GAS_WEB_APP_URL);
             
             new QRCode(qrContainer, {
                 text: shareableUrl,
@@ -626,26 +507,13 @@ function doPost(e) {
             });
         }
 
-        function copyDiscordLink() {
-            if (!GAS_WEB_APP_URL) return;
-            const shareableUrl = window.location.origin + window.location.pathname + "?db=" + encodeGasUrl(GAS_WEB_APP_URL);
-            
-            navigator.clipboard.writeText(shareableUrl).then(() => {
-                const btn = document.getElementById('discord-copy-btn');
-                const originalText = btn.innerHTML;
-                btn.innerHTML = "✅ Copied!";
-                setTimeout(() => { btn.innerHTML = originalText; }, 2000);
-            }).catch(err => {
-                showToast("Failed to copy link. Check browser permissions.", "error");
-            });
-        }
-
         function copyGasScript() {
             const scriptText = document.getElementById('gas-script-code').value;
             navigator.clipboard.writeText(scriptText).then(() => {
-                showToast("Script copied to clipboard!", "success");
+                alert("✅ Script copied to clipboard!");
             }).catch(err => {
-                showToast("Failed to copy. Please select the text and copy manually.", "error");
+                console.error("Failed to copy text: ", err);
+                alert("Failed to copy. Please select the text and copy manually.");
             });
         }
 
@@ -674,21 +542,8 @@ function doPost(e) {
             localStorage.setItem('dndDatabase', JSON.stringify(dbData));
         }
 
-        // --- AUTO SYNC WRAPPER ---
-        let syncTimeout = null;
-        function triggerAutoSync() {
-            saveLocalDatabase(); // Always save locally first
-            if (GAS_WEB_APP_URL) {
-                clearTimeout(syncTimeout);
-                // Wait 1 second after last change to push silently to cloud
-                syncTimeout = setTimeout(() => {
-                    syncToCloud(true);
-                }, 1000);
-            }
-        }
-
         // --- GOOGLE APPS SCRIPT LOGIC (Cloud Sync & Logins) ---
-        async function fetchCloudData(overwriteLocal = false, silent = false) {
+        async function fetchCloudData(overwriteLocal = false) {
             if (!GAS_WEB_APP_URL) return;
             
             try {
@@ -699,7 +554,7 @@ function doPost(e) {
                     throw new Error(`Invalid Database Signature. Expected Type: 'NPC Database', Version: '1.0'. Received Type: '${data.dbType}'`);
                 }
 
-                if (overwriteLocal && !silent) {
+                if (overwriteLocal) {
                     closeModal('setup-modal');
                 }
 
@@ -713,22 +568,20 @@ function doPost(e) {
                         ...pc, 
                         isPC: true,
                         name: pc.name || pc.CharacterName || "Unnamed PC",
-                        id: pc.id || 'pc_' + Date.now() + Math.floor(Math.random() * 1000),
-                        isHiddenInCombat: false
+                        id: pc.id || 'pc_' + Date.now() + Math.floor(Math.random() * 1000)
                     }));
                     
                     const cloudNPCs = (data.npcs || []).map(npc => ({
                         ...npc, 
                         isPC: false,
                         name: npc.name || "Unnamed NPC",
-                        id: npc.id || 'npc_' + Date.now() + Math.floor(Math.random() * 1000),
-                        isHiddenInCombat: false
+                        id: npc.id || 'npc_' + Date.now() + Math.floor(Math.random() * 1000)
                     }));
                     
                     state.entities = [...cloudPCs, ...cloudNPCs];
                     saveLocalDatabase();
                     renderAll();
-                    if(!silent) showToast("Database successfully pulled and validated!", "success");
+                    alert("✅ Data successfully pulled and validated from Google Sheets!");
                 } else {
                     (data.pcs || []).forEach(cloudPc => {
                         const localPc = state.entities.find(e => e.id === cloudPc.id);
@@ -744,30 +597,22 @@ function doPost(e) {
                 GAS_WEB_APP_URL = null;
                 updateConnectionUI();
                 document.getElementById('qr-section').style.display = 'none';
-                if(!silent) showSetupModalWithError(e.message || "Failed to connect to the provided URL.");
+                showSetupModalWithError(e.message || "Failed to connect to the provided URL.");
             }
         }
 
         function pullFromCloud() {
-            if (!GAS_WEB_APP_URL) {
-                showSetupModalWithError("Please connect a database first.");
-                return;
+            if (!GAS_WEB_APP_URL) return showSetupModalWithError("Please connect a database first.");
+            if (confirm("This will overwrite your local changes with the data in Google Sheets. Proceed?")) {
+                fetchCloudData(true);
             }
-            showConfirm("Pull Data from Cloud?", "This will overwrite your local changes with the data in Google Sheets. Proceed?", () => {
-                fetchCloudData(true, false);
-            });
         }
 
-        async function syncToCloud(silent = false) {
-            if (!GAS_WEB_APP_URL) {
-                if(!silent) showSetupModalWithError("Please connect a database first.");
-                return;
-            }
+        async function syncToCloud() {
+            if (!GAS_WEB_APP_URL) return showSetupModalWithError("Please connect a database first.");
 
-            // Exclude temp combatants from the cloud payload
-            const permanentEntities = state.entities.filter(e => !e.isTempCombatant);
-            const pcsArray = permanentEntities.filter(e => e.isPC);
-            const npcsArray = permanentEntities.filter(e => !e.isPC);
+            const pcsArray = state.entities.filter(e => e.isPC);
+            const npcsArray = state.entities.filter(e => !e.isPC);
 
             const payload = {
                 action: 'saveData',
@@ -784,14 +629,14 @@ function doPost(e) {
 
                 const result = await response.json();
                 if (result.status === "success") {
-                    if(!silent) showToast("Successfully saved to Google Sheets!", "success");
+                    alert("✅ Successfully saved to Google Sheets!");
                 } else {
                     console.error("Cloud Error:", result.error);
-                    if(!silent) showToast("Cloud sync failed. Error: " + result.error, "error");
+                    alert("❌ Cloud sync failed. Error: " + result.error);
                 }
             } catch (error) {
                 console.error("Network/Fetch Error:", error);
-                if(!silent) showToast("Network error during cloud sync.", "error");
+                alert("❌ Network error during cloud sync.");
             }
         }
 
@@ -811,30 +656,21 @@ function doPost(e) {
 
         function attemptLogin() {
             const playerName = document.getElementById('login-player-select').value;
-            const inputPin = document.getElementById('login-pin').value.trim();
+            const pin = document.getElementById('login-pin').value;
             
-            if (!playerName) {
-                showToast("Select a player!", "error");
-                return;
-            }
+            if (!playerName) return alert("Select a player!");
             
             const playerRec = state.playersFromSheet.find(p => p.PlayerName === playerName);
-            
-            if (playerRec && String(playerRec.PIN).trim() === inputPin) {
+            if (playerRec && String(playerRec.PIN) === String(pin)) {
                 state.currentUser = playerRec.PlayerName;
                 state.currentCharacter = playerRec.name || playerRec.CharacterName;
-                state.currentPin = inputPin;
+                state.currentPin = String(pin);
                 state.isDM = false; 
                 updateLoginUI();
                 closeModal('login-modal');
                 renderAll();
-                showToast(`Welcome back, ${state.currentUser}!`, "success");
-                
-                // Silent pull to ensure they have the absolute latest data from the DM upon login
-                if(GAS_WEB_APP_URL) fetchCloudData(true, true);
-                
             } else {
-                showToast("Incorrect PIN.", "error");
+                alert("Incorrect PIN.");
             }
         }
 
@@ -843,20 +679,17 @@ function doPost(e) {
                 state.isDM = false;
                 updateLoginUI();
                 renderAll();
-                showToast("DM status dropped.", "info");
                 return;
             }
             
-            showPromptModal((enteredPin) => {
-                if (enteredPin.trim() === state.currentPin) {
-                    state.isDM = true;
-                    updateLoginUI();
-                    renderAll();
-                    showToast("Elevated to Game Master successfully!", "success");
-                } else {
-                    showToast("Incorrect PIN. Elevation denied.", "error");
-                }
-            });
+            const enteredPin = prompt("Please enter your PIN again to verify DM elevation:");
+            if (enteredPin === state.currentPin) {
+                state.isDM = true;
+                updateLoginUI();
+                renderAll();
+            } else if (enteredPin !== null) {
+                alert("Incorrect PIN. Elevation denied.");
+            }
         }
 
         function logout() {
@@ -866,7 +699,6 @@ function doPost(e) {
             state.isDM = false;
             updateLoginUI();
             renderAll();
-            showToast("Successfully logged out.", "info");
         }
 
         function updateLoginUI() {
@@ -901,53 +733,25 @@ function doPost(e) {
             renderAll();
         }
 
-        function hideFromCombat(id) {
-            const ent = state.entities.find(e => e.id === id);
-            if (ent) {
-                ent.isHiddenInCombat = true;
-                renderAll();
-            }
-        }
-
-        function unhideAllCombat() {
-            state.entities.forEach(e => e.isHiddenInCombat = false);
-            renderAll();
-        }
-
         function renderAll() {
-            updateHometownDropdown(); 
-            
             const container = document.getElementById('npc-grid');
             const selectedHometown = document.getElementById('hometown-filter').value;
             container.innerHTML = '';
             
             container.className = state.viewMode === 'grid' ? 'grid-view' : 'table-container';
 
-            const displayList = [...state.entities]
-                .filter(e => {
-                    if (state.combatMode && e.isHiddenInCombat) return false;
-                    if (!state.combatMode && e.isTempCombatant) return false;
-                    return true;
-                })
-                .sort((a, b) => {
-                    if (state.combatMode) {
-                        return (b.initiative || 0) - (a.initiative || 0);
-                    }
-                    const getPriority = (ent) => {
-                        if (ent.isPC) return 4;
-                        if (ent.isTravelling && !ent.isPC) return 3; 
-                        if (selectedHometown && ent.hometown === selectedHometown && !ent.isPC) return 2; 
-                        return 1; 
-                    };
-                    return getPriority(b) - getPriority(a) || a.name.localeCompare(b.name);
-                });
-
-            // Handle unhide button visibility
-            const hiddenCount = state.entities.filter(e => e.isHiddenInCombat).length;
-            const unhideBtn = document.getElementById('unhide-combat-btn');
-            if (unhideBtn) {
-                unhideBtn.style.display = (state.combatMode && hiddenCount > 0) ? 'inline-flex' : 'none';
-            }
+            const displayList = [...state.entities].sort((a, b) => {
+                if (state.combatMode) {
+                    return (b.initiative || 0) - (a.initiative || 0);
+                }
+                const getPriority = (ent) => {
+                    if (ent.isTravelling) return 4; 
+                    if (ent.isPC) return 3; 
+                    if (ent.hometown === selectedHometown) return 2; 
+                    return 1; 
+                };
+                return getPriority(b) - getPriority(a) || a.name.localeCompare(b.name);
+            });
 
             if (state.viewMode === 'table') {
                 let tableHTML = `
@@ -974,12 +778,9 @@ function doPost(e) {
                     let tags = [];
                     if (ent.isPC) tags.push('<span class="badge badge-pc">PC</span>');
                     if (ent.isTravelling) tags.push('<span class="badge badge-travelling">PARTY</span>');
-                    if (ent.isTempCombatant) tags.push('<span class="badge badge-temp">TEMP</span>');
 
                     let statusHTML = (ent.statuses || []).map(s => {
-                        let pClass = 'status-pill';
-                        if (s.includes("Revived")) pClass += ' revived';
-                        if (s.includes("Exhausted")) pClass += ' exhausted';
+                        let pClass = s.includes("Revived") ? 'status-pill revived' : 'status-pill';
                         return `<span class="${pClass}">${s}</span>`;
                     }).join(' ');
 
@@ -989,32 +790,26 @@ function doPost(e) {
                         initHTML = `<td style="text-align:center;"><input type="number" style="width:50px; text-align:center; padding:4px;" value="${ent.initiative || 0}" onchange="updateInitiative('${ent.id}', this.value)" ${disabled}></td>`;
                     }
 
-                    let detailsStr = '';
-                    if (ent.description && ent.description.trim() !== '') {
-                        detailsStr += `<div style="font-size:12px; margin-bottom:5px;"><strong>Desc:</strong> ${ent.description}</div>`;
-                    }
-                    if (canSeeSecret && ent.secret && ent.secret.trim() !== '') {
+                    let detailsStr = `<div style="font-size:12px; margin-bottom:5px;"><strong>Desc:</strong> ${ent.description || 'N/A'}</div>`;
+                    if (canSeeSecret && ent.secret) {
                         detailsStr += `<div style="font-size:12px; color:#d192e8;"><strong>Secret:</strong> ${ent.secret}</div>`;
                     }
 
                     let actionHTML = '';
                     if (state.isDM || isOwner) {
-                        if (state.combatMode && !ent.isPC) {
-                            actionHTML += `<button onclick="hideFromCombat('${ent.id}')" style="font-size:11px; background:#e67e22; color:white; padding: 4px 8px; margin-right: 4px;">Hide</button>`;
-                        }
-                        if (!ent.isTempCombatant) {
-                            actionHTML += `<button onclick="editEntity('${ent.id}')" style="font-size:11px; background:#444; color:white; padding: 4px 8px; margin-right: 4px;">Edit</button>`;
-                        }
-                        actionHTML += `<button onclick="deleteEntity('${ent.id}')" style="font-size:11px; background:#c0392b; color:white; padding: 4px 8px;">Del</button>`;
+                        actionHTML = `
+                            <button onclick="editEntity('${ent.id}')" style="font-size:11px; background:#444; color:white; padding: 4px 8px; margin-right: 4px;">Edit</button>
+                            <button onclick="deleteEntity('${ent.id}')" style="font-size:11px; background:#c0392b; color:white; padding: 4px 8px;">Del</button>
+                        `;
                     }
 
                     tableHTML += `
                         <tr class="${isDead ? 'dead' : ''}">
                             <td>
                                 <strong>${ent.name}</strong>
-                                ${ent.tagline && ent.tagline.trim() !== '' ? `<br><span style="font-size:11px; color:#aaa; font-style:italic;">"${ent.tagline}"</span>` : ''}
+                                ${ent.tagline ? `<br><span style="font-size:11px; color:#aaa; font-style:italic;">"${ent.tagline}"</span>` : ''}
                             </td>
-                            <td>${ent.hometown || ''}</td>
+                            <td>${ent.hometown || '-'}</td>
                             <td>${tags.join('<br>')}</td>
                             ${initHTML}
                             <td><div class="status-container" style="margin:0;">${statusHTML}</div></td>
@@ -1027,7 +822,6 @@ function doPost(e) {
                 container.innerHTML = tableHTML;
 
             } else {
-                // GRID VIEW
                 displayList.forEach(ent => {
                     const isOwner = (state.currentUser === ent.createdBy) || (state.currentCharacter && ent.name === state.currentCharacter);
                     const canSeeSecret = state.isDM || isOwner;
@@ -1036,21 +830,17 @@ function doPost(e) {
                     let classes = ['npc-card'];
                     if (ent.isPC) classes.push('pc');
                     if (ent.isTravelling) classes.push('travelling');
-                    if (ent.isTempCombatant) classes.push('temp-combatant');
-                    if (ent.hometown === selectedHometown && !state.combatMode && !ent.isTempCombatant) classes.push('hometown-focus');
+                    if (ent.hometown === selectedHometown && !state.combatMode) classes.push('hometown-focus');
                     if (isDead) classes.push('dead');
 
                     const card = document.createElement('div');
                     card.className = classes.join(' ');
-                    if(ent.isTempCombatant) card.style.border = "2px dashed #e67e22";
                     
                     let statusHTML = '';
                     if (ent.statuses && ent.statuses.length > 0) {
                         statusHTML = `<div class="status-container">` + 
                             ent.statuses.map(s => {
-                                let pClass = 'status-pill';
-                                if (s.includes("Revived")) pClass += ' revived';
-                                if (s.includes("Exhausted")) pClass += ' exhausted';
+                                let pClass = s.includes("Revived") ? 'status-pill revived' : 'status-pill';
                                 return `<span class="${pClass}">${s}</span>`;
                             }).join('') + `</div>`;
                     }
@@ -1067,39 +857,27 @@ function doPost(e) {
                         `;
                     }
                     
-                    let descriptionBlock = (ent.description && ent.description.trim() !== '') ? `<div class="description-box">${ent.description}</div>` : '';
-                    let secretBlock = (canSeeSecret && ent.secret && ent.secret.trim() !== '') ? `<div class="secret-box"><strong>Secret:</strong> ${ent.secret}</div>` : '';
-
-                    let actionHTML = '';
-                    if (state.isDM || isOwner) {
-                        if (state.combatMode && !ent.isPC) {
-                            actionHTML += `<button onclick="hideFromCombat('${ent.id}')" style="font-size:11px; background:#e67e22; color:white; padding: 5px 10px; flex: 1;">Hide</button>`;
-                        }
-                        if (!ent.isTempCombatant) {
-                            actionHTML += `<button onclick="editEntity('${ent.id}')" style="font-size:11px; background:#444; color:white; padding: 5px 10px; flex: 1;">Edit Data</button>`;
-                        }
-                        actionHTML += `<button onclick="deleteEntity('${ent.id}')" style="font-size:11px; background:#c0392b; color:white; padding: 5px 10px; ${ent.isTempCombatant ? 'flex:1;' : ''}">Delete</button>`;
-                    }
-
                     card.innerHTML = `
                         <div class="card-content">
                             <div class="npc-meta">
-                                ${ent.hometown || ''}
+                                ${ent.hometown || 'Unknown Origin'}
                                 ${ent.isPC ? '<span class="badge badge-pc">PC</span>' : ''}
                                 ${ent.isTravelling ? '<span class="badge badge-travelling">TRAVELLING</span>' : ''}
-                                ${ent.isTempCombatant ? '<span class="badge badge-temp">TEMP</span>' : ''}
                             </div>
                             <h3 class="npc-name">${ent.name}</h3>
-                            ${ent.tagline && ent.tagline.trim() !== '' ? `<div class="npc-tagline">"${ent.tagline}"</div>` : ''}
+                            ${ent.tagline ? `<div class="npc-tagline">"${ent.tagline}"</div>` : ''}
                             
                             ${statusHTML}
                             ${initBoxHTML}
                             
-                            ${descriptionBlock}
-                            ${secretBlock}
+                            <div class="description-box">${ent.description}</div>
+                            ${canSeeSecret ? `<div class="secret-box"><strong>Secret:</strong> ${ent.secret || 'None'}</div>` : ''}
                             
                             <div style="margin-top: 10px; display: flex; gap: 5px;">
-                                ${actionHTML}
+                                ${(state.isDM || isOwner) ? `
+                                    <button onclick="editEntity('${ent.id}')" style="font-size:11px; background:#444; color:white; padding: 5px 10px; flex: 1;">Edit Data</button>
+                                    <button onclick="deleteEntity('${ent.id}')" style="font-size:11px; background:#c0392b; color:white; padding: 5px 10px;">Delete</button>
+                                ` : ''}
                             </div>
                         </div>
                     `;
@@ -1112,49 +890,15 @@ function doPost(e) {
         function toggleCombat() {
             state.combatMode = !state.combatMode;
             const btn = document.getElementById('combat-toggle-btn');
-            const addBtn = document.getElementById('add-combatant-btn');
-            
             if (state.combatMode) {
                 btn.classList.add('active');
                 btn.innerText = "🛑 End Combat";
-                addBtn.style.display = "inline-flex";
             } else {
                 btn.classList.remove('active');
                 btn.innerText = "⚔️ Toggle Combat";
-                addBtn.style.display = "none";
-                
-                state.entities = state.entities.filter(e => !e.isTempCombatant);
-                state.entities.forEach(e => {
-                    e.initiative = 0;
-                    e.isHiddenInCombat = false;
-                });
-                triggerAutoSync();
+                state.entities.forEach(e => e.initiative = 0);
+                saveLocalDatabase();
             }
-            renderAll();
-        }
-
-        function openCombatantModal() {
-            document.getElementById('c-name').value = '';
-            document.getElementById('c-init').value = '0';
-            document.getElementById('combatant-modal').style.display = 'flex';
-        }
-
-        function saveCombatant() {
-            const name = document.getElementById('c-name').value || "Unknown Enemy";
-            const init = parseInt(document.getElementById('c-init').value) || 0;
-            
-            state.entities.push({
-                id: 'temp_' + Date.now(),
-                name: name,
-                isTempCombatant: true,
-                initiative: init,
-                statuses: [],
-                isHiddenInCombat: false,
-                createdBy: state.currentUser || "DM"
-            });
-            
-            closeModal('combatant-modal');
-            triggerAutoSync(); 
             renderAll();
         }
 
@@ -1162,60 +906,35 @@ function doPost(e) {
             const ent = state.entities.find(e => e.id === id);
             if (ent) {
                 ent.initiative = parseInt(val) || 0;
-                triggerAutoSync();
+                saveLocalDatabase();
                 renderAll(); 
             }
         }
 
         function triggerLongRest() {
-            showConfirm("Long Rest", "Trigger a Long Rest? This will clear temporary statuses and alleviate Exhausted and Revived statuses by 1.", () => {
-                const tempStatuses = ["Blinded", "Charmed", "Deafened", "Frightened", "Grappled", "Incapacitated", "Invisible", "Paralyzed", "Petrified", "Poisoned", "Prone", "Restrained", "Stunned", "Unconscious"];
+            if (!confirm("Trigger a Long Rest? This will clear temporary statuses and progress Revived statuses.")) return;
+            
+            const tempStatuses = ["Blinded", "Charmed", "Deafened", "Frightened", "Grappled", "Incapacitated", "Invisible", "Paralyzed", "Petrified", "Poisoned", "Prone", "Restrained", "Stunned", "Unconscious"];
+            
+            state.entities.forEach(ent => {
+                if (!ent.statuses) ent.statuses = [];
                 
-                state.entities.forEach(ent => {
-                    if (!ent.statuses) ent.statuses = [];
-                    
-                    // 1. Clear temps
-                    ent.statuses = ent.statuses.filter(s => !tempStatuses.includes(s));
-                    
-                    // 2. Progress Exhausted
-                    if (ent.statuses.includes("Exhausted -6")) {
-                        ent.statuses = ent.statuses.filter(s => s !== "Exhausted -6");
-                        ent.statuses.push("Exhausted -5");
-                    } else if (ent.statuses.includes("Exhausted -5")) {
-                        ent.statuses = ent.statuses.filter(s => s !== "Exhausted -5");
-                        ent.statuses.push("Exhausted -4");
-                    } else if (ent.statuses.includes("Exhausted -4")) {
-                        ent.statuses = ent.statuses.filter(s => s !== "Exhausted -4");
-                        ent.statuses.push("Exhausted -3");
-                    } else if (ent.statuses.includes("Exhausted -3")) {
-                        ent.statuses = ent.statuses.filter(s => s !== "Exhausted -3");
-                        ent.statuses.push("Exhausted -2");
-                    } else if (ent.statuses.includes("Exhausted -2")) {
-                        ent.statuses = ent.statuses.filter(s => s !== "Exhausted -2");
-                        ent.statuses.push("Exhausted -1");
-                    } else if (ent.statuses.includes("Exhausted -1")) {
-                        ent.statuses = ent.statuses.filter(s => s !== "Exhausted -1");
-                    }
-                    
-                    // 3. Progress Revived
-                    if (ent.statuses.includes("Revived -4")) {
-                        ent.statuses = ent.statuses.filter(s => s !== "Revived -4");
-                        ent.statuses.push("Revived -3");
-                    } else if (ent.statuses.includes("Revived -3")) {
-                        ent.statuses = ent.statuses.filter(s => s !== "Revived -3");
-                        ent.statuses.push("Revived -2");
-                    } else if (ent.statuses.includes("Revived -2")) {
-                        ent.statuses = ent.statuses.filter(s => s !== "Revived -2");
-                        ent.statuses.push("Revived -1");
-                    } else if (ent.statuses.includes("Revived -1")) {
-                        ent.statuses = ent.statuses.filter(s => s !== "Revived -1");
-                    }
-                });
+                ent.statuses = ent.statuses.filter(s => !tempStatuses.includes(s));
                 
-                triggerAutoSync();
-                renderAll();
-                showToast("Long Rest completed. Statuses updated.", "success");
+                if (ent.statuses.includes("Revived -3")) {
+                    ent.statuses = ent.statuses.filter(s => s !== "Revived -3");
+                    ent.statuses.push("Revived -2");
+                } else if (ent.statuses.includes("Revived -2")) {
+                    ent.statuses = ent.statuses.filter(s => s !== "Revived -2");
+                    ent.statuses.push("Revived -1");
+                } else if (ent.statuses.includes("Revived -1")) {
+                    ent.statuses = ent.statuses.filter(s => s !== "Revived -1");
+                }
             });
+            
+            saveLocalDatabase();
+            renderAll();
+            alert("Long Rest completed. Statuses updated.");
         }
 
         // --- ADD/EDIT/DELETE LOGIC ---
@@ -1230,10 +949,10 @@ function doPost(e) {
             document.getElementById('f-isPC').checked = ent.isPC || false;
             document.getElementById('f-name').value = ent.name;
             document.getElementById('f-tagline').value = ent.tagline || '';
-            document.getElementById('f-hometown').value = ent.hometown || '';
-            document.getElementById('f-description').value = ent.description || '';
+            document.getElementById('f-hometown').value = ent.hometown;
+            document.getElementById('f-description').value = ent.description;
             document.getElementById('f-secret').value = ent.secret || '';
-            document.getElementById('f-travelling').checked = ent.isTravelling || false;
+            document.getElementById('f-travelling').checked = ent.isTravelling;
             
             document.querySelectorAll('.status-cb').forEach(cb => {
                 cb.checked = ent.statuses && ent.statuses.includes(cb.value);
@@ -1245,12 +964,11 @@ function doPost(e) {
         }
 
         function deleteEntity(id) {
-            showConfirm("Delete Character", "Are you sure you want to permanently delete this character?", () => {
+            if(confirm("Are you sure you want to permanently delete this character?")) {
                 state.entities = state.entities.filter(e => e.id !== id);
-                triggerAutoSync();
+                saveLocalDatabase();
                 renderAll();
-                showToast("Character deleted.", "success");
-            });
+            }
         }
 
         function saveEntity() {
@@ -1271,7 +989,6 @@ function doPost(e) {
                 isTravelling: document.getElementById('f-travelling').checked,
                 statuses: activeStatuses,
                 initiative: existingEnt.initiative || 0,
-                isHiddenInCombat: existingEnt.isHiddenInCombat || false,
                 createdBy: existingEnt.createdBy || (state.currentUser || "DM")
             };
 
@@ -1282,30 +999,33 @@ function doPost(e) {
                 state.entities.push(ent);
             }
 
-            triggerAutoSync();
+            saveLocalDatabase();
             closeModal('npc-modal');
             renderAll();
-            showToast("Character saved successfully.", "success");
         }
 
         // --- EXPORT LOGIC ---
-        function exportStartOfGame() {
-            let log = `START OF GAME SUMMARY\n========================\n\n`;
+        function exportSessionLog() {
+            let log = `WEEKLY GAME SESSION LOG\n========================\n\n`;
             
             log += `ACTIVE PARTY & COMPANIONS:\n`;
             state.entities.filter(n => n.isTravelling || n.isPC).forEach(n => {
-                if(n.isTempCombatant) return;
                 const tagStr = n.tagline ? ` [${n.tagline}]` : '';
                 const statusStr = (n.statuses && n.statuses.length > 0) ? ` {Status: ${n.statuses.join(', ')}}` : '';
-                const hometownStr = n.hometown ? `\n  Hometown: ${n.hometown}` : '';
-                const descStr = n.description ? `\n  ${n.description}` : '';
-                log += `- ${n.name}${tagStr}${statusStr}${hometownStr}${descStr}\n\n`;
+                log += `- ${n.name}${tagStr}${statusStr}\n  Hometown: ${n.hometown}\n  ${n.description}\n\n`;
+            });
+
+            log += `OTHER NOTABLE NPCS:\n`;
+            state.entities.filter(n => !n.isTravelling && !n.isPC).forEach(n => {
+                const tagStr = n.tagline ? ` [${n.tagline}]` : '';
+                log += `- ${n.name}${tagStr}: ${n.description}\n`;
             });
 
             navigator.clipboard.writeText(log).then(() => {
-                showToast("Start of Game summary copied to clipboard!", "success");
+                alert("Session log copied to your clipboard successfully!");
             }).catch(err => {
-                showToast("Could not copy to clipboard. Check browser permissions.", "error");
+                console.error("Failed to copy text: ", err);
+                alert("Could not copy to clipboard. Check browser permissions.");
             });
         }
 
