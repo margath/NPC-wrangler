@@ -121,6 +121,7 @@
             <button class="view-btn" onclick="toggleView()">🗂️ Toggle View</button>
             <button class="combat-btn" id="combat-toggle-btn" onclick="toggleCombat()">⚔️ Toggle Combat</button>
             <button class="add-btn" id="add-combatant-btn" onclick="openCombatantModal()" style="display:none; background:#e67e22; color:white;">+ Add Combatant</button>
+            <button class="add-btn" id="unhide-combat-btn" onclick="unhideAllCombat()" style="display:none; background:#f39c12; color:#111;">👁️ Unhide All</button>
             <button class="rest-btn" onclick="triggerLongRest()">🏕️ Long Rest</button>
             
             <button class="session-btn" onclick="exportStartOfGame()">📜 Start of Game Summary</button>
@@ -712,14 +713,16 @@ function doPost(e) {
                         ...pc, 
                         isPC: true,
                         name: pc.name || pc.CharacterName || "Unnamed PC",
-                        id: pc.id || 'pc_' + Date.now() + Math.floor(Math.random() * 1000)
+                        id: pc.id || 'pc_' + Date.now() + Math.floor(Math.random() * 1000),
+                        isHiddenInCombat: false
                     }));
                     
                     const cloudNPCs = (data.npcs || []).map(npc => ({
                         ...npc, 
                         isPC: false,
                         name: npc.name || "Unnamed NPC",
-                        id: npc.id || 'npc_' + Date.now() + Math.floor(Math.random() * 1000)
+                        id: npc.id || 'npc_' + Date.now() + Math.floor(Math.random() * 1000),
+                        isHiddenInCombat: false
                     }));
                     
                     state.entities = [...cloudPCs, ...cloudNPCs];
@@ -898,6 +901,19 @@ function doPost(e) {
             renderAll();
         }
 
+        function hideFromCombat(id) {
+            const ent = state.entities.find(e => e.id === id);
+            if (ent) {
+                ent.isHiddenInCombat = true;
+                renderAll();
+            }
+        }
+
+        function unhideAllCombat() {
+            state.entities.forEach(e => e.isHiddenInCombat = false);
+            renderAll();
+        }
+
         function renderAll() {
             updateHometownDropdown(); 
             
@@ -907,19 +923,31 @@ function doPost(e) {
             
             container.className = state.viewMode === 'grid' ? 'grid-view' : 'table-container';
 
-            const displayList = [...state.entities].sort((a, b) => {
-                if (state.combatMode) {
-                    return (b.initiative || 0) - (a.initiative || 0);
-                }
-                const getPriority = (ent) => {
-                    if (ent.isTempCombatant) return 0; 
-                    if (ent.isTravelling) return 4; 
-                    if (ent.isPC) return 3; 
-                    if (ent.hometown === selectedHometown) return 2; 
-                    return 1; 
-                };
-                return getPriority(b) - getPriority(a) || a.name.localeCompare(b.name);
-            });
+            const displayList = [...state.entities]
+                .filter(e => {
+                    if (state.combatMode && e.isHiddenInCombat) return false;
+                    if (!state.combatMode && e.isTempCombatant) return false;
+                    return true;
+                })
+                .sort((a, b) => {
+                    if (state.combatMode) {
+                        return (b.initiative || 0) - (a.initiative || 0);
+                    }
+                    const getPriority = (ent) => {
+                        if (ent.isPC) return 4;
+                        if (ent.isTravelling && !ent.isPC) return 3; 
+                        if (selectedHometown && ent.hometown === selectedHometown && !ent.isPC) return 2; 
+                        return 1; 
+                    };
+                    return getPriority(b) - getPriority(a) || a.name.localeCompare(b.name);
+                });
+
+            // Handle unhide button visibility
+            const hiddenCount = state.entities.filter(e => e.isHiddenInCombat).length;
+            const unhideBtn = document.getElementById('unhide-combat-btn');
+            if (unhideBtn) {
+                unhideBtn.style.display = (state.combatMode && hiddenCount > 0) ? 'inline-flex' : 'none';
+            }
 
             if (state.viewMode === 'table') {
                 let tableHTML = `
@@ -939,8 +967,6 @@ function doPost(e) {
                 `;
 
                 displayList.forEach(ent => {
-                    if(!state.combatMode && ent.isTempCombatant) return;
-
                     const isOwner = (state.currentUser === ent.createdBy) || (state.currentCharacter && ent.name === state.currentCharacter);
                     const canSeeSecret = state.isDM || isOwner;
                     const isDead = ent.statuses && ent.statuses.includes("Dead");
@@ -973,10 +999,13 @@ function doPost(e) {
 
                     let actionHTML = '';
                     if (state.isDM || isOwner) {
-                        actionHTML = `
-                            ${!ent.isTempCombatant ? `<button onclick="editEntity('${ent.id}')" style="font-size:11px; background:#444; color:white; padding: 4px 8px; margin-right: 4px;">Edit</button>` : ''}
-                            <button onclick="deleteEntity('${ent.id}')" style="font-size:11px; background:#c0392b; color:white; padding: 4px 8px;">Del</button>
-                        `;
+                        if (state.combatMode && !ent.isPC) {
+                            actionHTML += `<button onclick="hideFromCombat('${ent.id}')" style="font-size:11px; background:#e67e22; color:white; padding: 4px 8px; margin-right: 4px;">Hide</button>`;
+                        }
+                        if (!ent.isTempCombatant) {
+                            actionHTML += `<button onclick="editEntity('${ent.id}')" style="font-size:11px; background:#444; color:white; padding: 4px 8px; margin-right: 4px;">Edit</button>`;
+                        }
+                        actionHTML += `<button onclick="deleteEntity('${ent.id}')" style="font-size:11px; background:#c0392b; color:white; padding: 4px 8px;">Del</button>`;
                     }
 
                     tableHTML += `
@@ -1000,8 +1029,6 @@ function doPost(e) {
             } else {
                 // GRID VIEW
                 displayList.forEach(ent => {
-                    if(!state.combatMode && ent.isTempCombatant) return;
-
                     const isOwner = (state.currentUser === ent.createdBy) || (state.currentCharacter && ent.name === state.currentCharacter);
                     const canSeeSecret = state.isDM || isOwner;
                     const isDead = ent.statuses && ent.statuses.includes("Dead");
@@ -1043,6 +1070,17 @@ function doPost(e) {
                     let descriptionBlock = (ent.description && ent.description.trim() !== '') ? `<div class="description-box">${ent.description}</div>` : '';
                     let secretBlock = (canSeeSecret && ent.secret && ent.secret.trim() !== '') ? `<div class="secret-box"><strong>Secret:</strong> ${ent.secret}</div>` : '';
 
+                    let actionHTML = '';
+                    if (state.isDM || isOwner) {
+                        if (state.combatMode && !ent.isPC) {
+                            actionHTML += `<button onclick="hideFromCombat('${ent.id}')" style="font-size:11px; background:#e67e22; color:white; padding: 5px 10px; flex: 1;">Hide</button>`;
+                        }
+                        if (!ent.isTempCombatant) {
+                            actionHTML += `<button onclick="editEntity('${ent.id}')" style="font-size:11px; background:#444; color:white; padding: 5px 10px; flex: 1;">Edit Data</button>`;
+                        }
+                        actionHTML += `<button onclick="deleteEntity('${ent.id}')" style="font-size:11px; background:#c0392b; color:white; padding: 5px 10px; ${ent.isTempCombatant ? 'flex:1;' : ''}">Delete</button>`;
+                    }
+
                     card.innerHTML = `
                         <div class="card-content">
                             <div class="npc-meta">
@@ -1061,10 +1099,7 @@ function doPost(e) {
                             ${secretBlock}
                             
                             <div style="margin-top: 10px; display: flex; gap: 5px;">
-                                ${(state.isDM || isOwner) ? `
-                                    ${!ent.isTempCombatant ? `<button onclick="editEntity('${ent.id}')" style="font-size:11px; background:#444; color:white; padding: 5px 10px; flex: 1;">Edit Data</button>` : ''}
-                                    <button onclick="deleteEntity('${ent.id}')" style="font-size:11px; background:#c0392b; color:white; padding: 5px 10px; ${ent.isTempCombatant ? 'flex:1;' : ''}">Delete</button>
-                                ` : ''}
+                                ${actionHTML}
                             </div>
                         </div>
                     `;
@@ -1089,7 +1124,10 @@ function doPost(e) {
                 addBtn.style.display = "none";
                 
                 state.entities = state.entities.filter(e => !e.isTempCombatant);
-                state.entities.forEach(e => e.initiative = 0);
+                state.entities.forEach(e => {
+                    e.initiative = 0;
+                    e.isHiddenInCombat = false;
+                });
                 triggerAutoSync();
             }
             renderAll();
@@ -1111,6 +1149,7 @@ function doPost(e) {
                 isTempCombatant: true,
                 initiative: init,
                 statuses: [],
+                isHiddenInCombat: false,
                 createdBy: state.currentUser || "DM"
             });
             
@@ -1232,6 +1271,7 @@ function doPost(e) {
                 isTravelling: document.getElementById('f-travelling').checked,
                 statuses: activeStatuses,
                 initiative: existingEnt.initiative || 0,
+                isHiddenInCombat: existingEnt.isHiddenInCombat || false,
                 createdBy: existingEnt.createdBy || (state.currentUser || "DM")
             };
 
