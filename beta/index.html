@@ -42,6 +42,7 @@
         .badge { padding: 2px 6px; border-radius: 4px; font-size: 10px; margin-left: 5px; vertical-align: middle; font-weight: bold; color: #000; }
         .badge-pc { background: #f1c40f; }
         .badge-travelling { background: #2ecc71; }
+        .badge-temp { background: #e67e22; color: white; }
         .status-container { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 10px; }
         .status-pill { background: #e74c3c; color: white; padding: 3px 8px; border-radius: 12px; font-size: 11px; font-weight: bold; white-space: nowrap; }
         .status-pill.revived { background: #e67e22; }
@@ -117,10 +118,11 @@
             </select>
             <button class="view-btn" onclick="toggleView()">🗂️ Toggle View</button>
             <button class="combat-btn" id="combat-toggle-btn" onclick="toggleCombat()">⚔️ Toggle Combat</button>
+            <button class="add-btn" id="add-combatant-btn" onclick="openCombatantModal()" style="display:none; background:#e67e22; color:white;">+ Add Combatant</button>
             <button class="rest-btn" onclick="triggerLongRest()">🏕️ Long Rest</button>
             
             <button class="cloud-btn pull" onclick="pullFromCloud()">☁️ Pull Data</button>
-            <button class="cloud-btn" onclick="syncToCloud()">☁️ Save to Cloud</button>
+            <button class="cloud-btn" onclick="syncToCloud()">☁️ Force Sync</button>
             
             <button class="add-btn" onclick="openAddModal()">+ New PC/NPC</button>
             
@@ -158,6 +160,18 @@
         </div>
     </div>
 
+    <div id="combatant-modal" class="modal-overlay">
+        <div class="modal-box" style="max-width: 300px;">
+            <h2 style="margin-top: 0;">Add Combatant</h2>
+            <input type="text" id="c-name" placeholder="Name (e.g. Goblin 1)">
+            <input type="number" id="c-init" placeholder="Initiative" value="0">
+            <div style="display:flex; gap: 10px; margin-top: 15px;">
+                <button onclick="saveCombatant()" class="add-btn" style="flex:1; height: 40px;">Add</button>
+                <button onclick="closeModal('combatant-modal')" style="background:#555; color:white; flex:1; height: 40px; border:none; border-radius:4px; cursor:pointer;">Cancel</button>
+            </div>
+        </div>
+    </div>
+
     <div id="npc-modal" class="modal-overlay">
         <div class="modal-box">
             <h2 id="modal-title">Add PC/NPC</h2>
@@ -168,7 +182,7 @@
 
             <input type="text" id="f-name" placeholder="Name">
             <input type="text" id="f-tagline" placeholder="Tagline (e.g. 'The brooding rogue')">
-            <input type="text" id="f-hometown" placeholder="Hometown (or select from list)">
+            <input type="text" id="f-hometown" placeholder="Hometown (Adds to dropdown filter)">
             <textarea id="f-description" placeholder="Public Description"></textarea>
             <textarea id="f-secret" placeholder="Secret (DM/Owner Only)"></textarea>
             
@@ -359,7 +373,6 @@ function doPost(e) {
         // --- CONSTANTS & DATA ---
         let GAS_WEB_APP_URL = null; 
         
-        const HOMETOWNS = ["Solomani Rim", "Terra", "Vanejen", "Spinward Marches", "Waterdeep", "Neverwinter", "Baldur's Gate"];
         const STATUSES = [
             "Blinded", "Charmed", "Deafened", "Frightened", "Grappled", 
             "Incapacitated", "Invisible", "Paralyzed", "Petrified", "Poisoned", 
@@ -432,22 +445,18 @@ function doPost(e) {
         // --- URL COMPRESSION & OBFUSCATION ---
         function encodeGasUrl(url) {
             try {
-                // Extract just the deployment ID to compress the footprint
                 let match = url.match(/\/s\/([^/]+)\/exec/);
                 let payload = match ? "ID|" + match[1] : "URL|" + url;
-                // Base64 encode and make URL safe
                 return btoa(payload).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
             } catch(e) { return ""; }
         }
 
         function decodeGasUrl(encoded) {
             try {
-                // Reverse URL safe formatting
                 let str = encoded.replace(/-/g, '+').replace(/_/g, '/');
                 while (str.length % 4) str += '=';
                 let decoded = atob(str);
                 
-                // Reconstruct Google Script URL
                 if (decoded.startsWith("ID|")) {
                     return "https://script.google.com/macros/s/" + decoded.substring(3) + "/exec";
                 } else if (decoded.startsWith("URL|")) {
@@ -460,7 +469,7 @@ function doPost(e) {
         // --- INIT & SETUP LOGIC ---
         function init() {
             const urlParams = new URLSearchParams(window.location.search);
-            const dbParam = urlParams.get('db'); // Stealth param
+            const dbParam = urlParams.get('db'); 
             
             if (dbParam) {
                 const decodedUrl = decodeGasUrl(dbParam);
@@ -472,13 +481,6 @@ function doPost(e) {
 
             GAS_WEB_APP_URL = sessionStorage.getItem('GAS_WEB_APP_URL');
 
-            const filter = document.getElementById('hometown-filter');
-            HOMETOWNS.forEach(h => {
-                const opt = document.createElement('option');
-                opt.value = h; opt.innerText = h;
-                filter.appendChild(opt);
-            });
-
             const statusGrid = document.getElementById('status-grid');
             STATUSES.forEach(s => {
                 statusGrid.innerHTML += `<label><input type="checkbox" value="${s}" class="status-cb"> ${s}</label>`;
@@ -489,12 +491,27 @@ function doPost(e) {
             updateConnectionUI();
 
             if (GAS_WEB_APP_URL) {
-                fetchCloudData(false);
+                fetchCloudData(true, true); // Silent pull on load
             } else {
                 openSetupModal();
+                renderAll();
             }
+        }
 
-            renderAll();
+        function updateHometownDropdown() {
+            const filter = document.getElementById('hometown-filter');
+            const currentVal = filter.value;
+            filter.innerHTML = '<option value="">Sort by Hometown...</option>';
+            
+            // Extract unique hometowns dynamically
+            const uniqueHometowns = [...new Set(state.entities.map(e => e.hometown).filter(h => h && h.trim() !== ''))].sort();
+            
+            uniqueHometowns.forEach(h => {
+                const opt = document.createElement('option');
+                opt.value = h; opt.innerText = h;
+                filter.appendChild(opt);
+            });
+            filter.value = currentVal; 
         }
 
         function updateConnectionUI() {
@@ -584,7 +601,7 @@ function doPost(e) {
             generateShareQRCode();
             updateConnectionUI();
             
-            fetchCloudData(true);
+            fetchCloudData(true, false);
         }
 
         function generateShareQRCode() {
@@ -652,8 +669,21 @@ function doPost(e) {
             localStorage.setItem('dndDatabase', JSON.stringify(dbData));
         }
 
+        // --- AUTO SYNC WRAPPER ---
+        let syncTimeout = null;
+        function triggerAutoSync() {
+            saveLocalDatabase(); // Always save locally first
+            if (GAS_WEB_APP_URL) {
+                clearTimeout(syncTimeout);
+                // Wait 1 second after last change to push silently to cloud
+                syncTimeout = setTimeout(() => {
+                    syncToCloud(true);
+                }, 1000);
+            }
+        }
+
         // --- GOOGLE APPS SCRIPT LOGIC (Cloud Sync & Logins) ---
-        async function fetchCloudData(overwriteLocal = false) {
+        async function fetchCloudData(overwriteLocal = false, silent = false) {
             if (!GAS_WEB_APP_URL) return;
             
             try {
@@ -664,7 +694,7 @@ function doPost(e) {
                     throw new Error(`Invalid Database Signature. Expected Type: 'NPC Database', Version: '1.0'. Received Type: '${data.dbType}'`);
                 }
 
-                if (overwriteLocal) {
+                if (overwriteLocal && !silent) {
                     closeModal('setup-modal');
                 }
 
@@ -691,7 +721,7 @@ function doPost(e) {
                     state.entities = [...cloudPCs, ...cloudNPCs];
                     saveLocalDatabase();
                     renderAll();
-                    showToast("Database successfully pulled and validated!", "success");
+                    if(!silent) showToast("Database successfully pulled and validated!", "success");
                 } else {
                     (data.pcs || []).forEach(cloudPc => {
                         const localPc = state.entities.find(e => e.id === cloudPc.id);
@@ -707,7 +737,7 @@ function doPost(e) {
                 GAS_WEB_APP_URL = null;
                 updateConnectionUI();
                 document.getElementById('qr-section').style.display = 'none';
-                showSetupModalWithError(e.message || "Failed to connect to the provided URL.");
+                if(!silent) showSetupModalWithError(e.message || "Failed to connect to the provided URL.");
             }
         }
 
@@ -717,18 +747,20 @@ function doPost(e) {
                 return;
             }
             showConfirm("Pull Data from Cloud?", "This will overwrite your local changes with the data in Google Sheets. Proceed?", () => {
-                fetchCloudData(true);
+                fetchCloudData(true, false);
             });
         }
 
-        async function syncToCloud() {
+        async function syncToCloud(silent = false) {
             if (!GAS_WEB_APP_URL) {
-                showSetupModalWithError("Please connect a database first.");
+                if(!silent) showSetupModalWithError("Please connect a database first.");
                 return;
             }
 
-            const pcsArray = state.entities.filter(e => e.isPC);
-            const npcsArray = state.entities.filter(e => !e.isPC);
+            // Exclude temp combatants from the cloud payload
+            const permanentEntities = state.entities.filter(e => !e.isTempCombatant);
+            const pcsArray = permanentEntities.filter(e => e.isPC);
+            const npcsArray = permanentEntities.filter(e => !e.isPC);
 
             const payload = {
                 action: 'saveData',
@@ -745,14 +777,14 @@ function doPost(e) {
 
                 const result = await response.json();
                 if (result.status === "success") {
-                    showToast("Successfully saved to Google Sheets!", "success");
+                    if(!silent) showToast("Successfully saved to Google Sheets!", "success");
                 } else {
                     console.error("Cloud Error:", result.error);
-                    showToast("Cloud sync failed. Error: " + result.error, "error");
+                    if(!silent) showToast("Cloud sync failed. Error: " + result.error, "error");
                 }
             } catch (error) {
                 console.error("Network/Fetch Error:", error);
-                showToast("Network error during cloud sync.", "error");
+                if(!silent) showToast("Network error during cloud sync.", "error");
             }
         }
 
@@ -790,6 +822,10 @@ function doPost(e) {
                 closeModal('login-modal');
                 renderAll();
                 showToast(`Welcome back, ${state.currentUser}!`, "success");
+                
+                // Silent pull to ensure they have the absolute latest data from the DM upon login
+                if(GAS_WEB_APP_URL) fetchCloudData(true, true);
+                
             } else {
                 showToast("Incorrect PIN.", "error");
             }
@@ -859,6 +895,8 @@ function doPost(e) {
         }
 
         function renderAll() {
+            updateHometownDropdown(); // Ensure filter list is always current
+            
             const container = document.getElementById('npc-grid');
             const selectedHometown = document.getElementById('hometown-filter').value;
             container.innerHTML = '';
@@ -870,6 +908,7 @@ function doPost(e) {
                     return (b.initiative || 0) - (a.initiative || 0);
                 }
                 const getPriority = (ent) => {
+                    if (ent.isTempCombatant) return 0; // Hide from standard view
                     if (ent.isTravelling) return 4; 
                     if (ent.isPC) return 3; 
                     if (ent.hometown === selectedHometown) return 2; 
@@ -896,6 +935,9 @@ function doPost(e) {
                 `;
 
                 displayList.forEach(ent => {
+                    // Do not show temp combatants when not in combat mode
+                    if(!state.combatMode && ent.isTempCombatant) return;
+
                     const isOwner = (state.currentUser === ent.createdBy) || (state.currentCharacter && ent.name === state.currentCharacter);
                     const canSeeSecret = state.isDM || isOwner;
                     const isDead = ent.statuses && ent.statuses.includes("Dead");
@@ -903,6 +945,7 @@ function doPost(e) {
                     let tags = [];
                     if (ent.isPC) tags.push('<span class="badge badge-pc">PC</span>');
                     if (ent.isTravelling) tags.push('<span class="badge badge-travelling">PARTY</span>');
+                    if (ent.isTempCombatant) tags.push('<span class="badge badge-temp">TEMP</span>');
 
                     let statusHTML = (ent.statuses || []).map(s => {
                         let pClass = s.includes("Revived") ? 'status-pill revived' : 'status-pill';
@@ -926,7 +969,7 @@ function doPost(e) {
                     let actionHTML = '';
                     if (state.isDM || isOwner) {
                         actionHTML = `
-                            <button onclick="editEntity('${ent.id}')" style="font-size:11px; background:#444; color:white; padding: 4px 8px; margin-right: 4px;">Edit</button>
+                            ${!ent.isTempCombatant ? `<button onclick="editEntity('${ent.id}')" style="font-size:11px; background:#444; color:white; padding: 4px 8px; margin-right: 4px;">Edit</button>` : ''}
                             <button onclick="deleteEntity('${ent.id}')" style="font-size:11px; background:#c0392b; color:white; padding: 4px 8px;">Del</button>
                         `;
                     }
@@ -952,6 +995,8 @@ function doPost(e) {
             } else {
                 // GRID VIEW
                 displayList.forEach(ent => {
+                    if(!state.combatMode && ent.isTempCombatant) return;
+
                     const isOwner = (state.currentUser === ent.createdBy) || (state.currentCharacter && ent.name === state.currentCharacter);
                     const canSeeSecret = state.isDM || isOwner;
                     const isDead = ent.statuses && ent.statuses.includes("Dead");
@@ -959,11 +1004,13 @@ function doPost(e) {
                     let classes = ['npc-card'];
                     if (ent.isPC) classes.push('pc');
                     if (ent.isTravelling) classes.push('travelling');
-                    if (ent.hometown === selectedHometown && !state.combatMode) classes.push('hometown-focus');
+                    if (ent.isTempCombatant) classes.push('temp-combatant');
+                    if (ent.hometown === selectedHometown && !state.combatMode && !ent.isTempCombatant) classes.push('hometown-focus');
                     if (isDead) classes.push('dead');
 
                     const card = document.createElement('div');
                     card.className = classes.join(' ');
+                    if(ent.isTempCombatant) card.style.border = "2px dashed #e67e22";
                     
                     let statusHTML = '';
                     if (ent.statuses && ent.statuses.length > 0) {
@@ -995,6 +1042,7 @@ function doPost(e) {
                                 ${ent.hometown || ''}
                                 ${ent.isPC ? '<span class="badge badge-pc">PC</span>' : ''}
                                 ${ent.isTravelling ? '<span class="badge badge-travelling">TRAVELLING</span>' : ''}
+                                ${ent.isTempCombatant ? '<span class="badge badge-temp">TEMP</span>' : ''}
                             </div>
                             <h3 class="npc-name">${ent.name}</h3>
                             ${ent.tagline && ent.tagline.trim() !== '' ? `<div class="npc-tagline">"${ent.tagline}"</div>` : ''}
@@ -1007,8 +1055,8 @@ function doPost(e) {
                             
                             <div style="margin-top: 10px; display: flex; gap: 5px;">
                                 ${(state.isDM || isOwner) ? `
-                                    <button onclick="editEntity('${ent.id}')" style="font-size:11px; background:#444; color:white; padding: 5px 10px; flex: 1;">Edit Data</button>
-                                    <button onclick="deleteEntity('${ent.id}')" style="font-size:11px; background:#c0392b; color:white; padding: 5px 10px;">Delete</button>
+                                    ${!ent.isTempCombatant ? `<button onclick="editEntity('${ent.id}')" style="font-size:11px; background:#444; color:white; padding: 5px 10px; flex: 1;">Edit Data</button>` : ''}
+                                    <button onclick="deleteEntity('${ent.id}')" style="font-size:11px; background:#c0392b; color:white; padding: 5px 10px; ${ent.isTempCombatant ? 'flex:1;' : ''}">Delete</button>
                                 ` : ''}
                             </div>
                         </div>
@@ -1022,15 +1070,46 @@ function doPost(e) {
         function toggleCombat() {
             state.combatMode = !state.combatMode;
             const btn = document.getElementById('combat-toggle-btn');
+            const addBtn = document.getElementById('add-combatant-btn');
+            
             if (state.combatMode) {
                 btn.classList.add('active');
                 btn.innerText = "🛑 End Combat";
+                addBtn.style.display = "inline-flex";
             } else {
                 btn.classList.remove('active');
                 btn.innerText = "⚔️ Toggle Combat";
+                addBtn.style.display = "none";
+                
+                // Clear initiatives and drop temp combatants
+                state.entities = state.entities.filter(e => !e.isTempCombatant);
                 state.entities.forEach(e => e.initiative = 0);
-                saveLocalDatabase();
+                triggerAutoSync();
             }
+            renderAll();
+        }
+
+        function openCombatantModal() {
+            document.getElementById('c-name').value = '';
+            document.getElementById('c-init').value = '0';
+            document.getElementById('combatant-modal').style.display = 'flex';
+        }
+
+        function saveCombatant() {
+            const name = document.getElementById('c-name').value || "Unknown Enemy";
+            const init = parseInt(document.getElementById('c-init').value) || 0;
+            
+            state.entities.push({
+                id: 'temp_' + Date.now(),
+                name: name,
+                isTempCombatant: true,
+                initiative: init,
+                statuses: [],
+                createdBy: state.currentUser || "DM"
+            });
+            
+            closeModal('combatant-modal');
+            triggerAutoSync(); // Note: temp combatants are saved locally but stripped out before cloud sync
             renderAll();
         }
 
@@ -1038,7 +1117,7 @@ function doPost(e) {
             const ent = state.entities.find(e => e.id === id);
             if (ent) {
                 ent.initiative = parseInt(val) || 0;
-                saveLocalDatabase();
+                triggerAutoSync();
                 renderAll(); 
             }
         }
@@ -1063,7 +1142,7 @@ function doPost(e) {
                     }
                 });
                 
-                saveLocalDatabase();
+                triggerAutoSync();
                 renderAll();
                 showToast("Long Rest completed. Statuses updated.", "success");
             });
@@ -1081,10 +1160,10 @@ function doPost(e) {
             document.getElementById('f-isPC').checked = ent.isPC || false;
             document.getElementById('f-name').value = ent.name;
             document.getElementById('f-tagline').value = ent.tagline || '';
-            document.getElementById('f-hometown').value = ent.hometown;
-            document.getElementById('f-description').value = ent.description;
+            document.getElementById('f-hometown').value = ent.hometown || '';
+            document.getElementById('f-description').value = ent.description || '';
             document.getElementById('f-secret').value = ent.secret || '';
-            document.getElementById('f-travelling').checked = ent.isTravelling;
+            document.getElementById('f-travelling').checked = ent.isTravelling || false;
             
             document.querySelectorAll('.status-cb').forEach(cb => {
                 cb.checked = ent.statuses && ent.statuses.includes(cb.value);
@@ -1098,7 +1177,7 @@ function doPost(e) {
         function deleteEntity(id) {
             showConfirm("Delete Character", "Are you sure you want to permanently delete this character?", () => {
                 state.entities = state.entities.filter(e => e.id !== id);
-                saveLocalDatabase();
+                triggerAutoSync();
                 renderAll();
                 showToast("Character deleted.", "success");
             });
@@ -1132,7 +1211,7 @@ function doPost(e) {
                 state.entities.push(ent);
             }
 
-            saveLocalDatabase();
+            triggerAutoSync();
             closeModal('npc-modal');
             renderAll();
             showToast("Character saved successfully.", "success");
@@ -1144,15 +1223,20 @@ function doPost(e) {
             
             log += `ACTIVE PARTY & COMPANIONS:\n`;
             state.entities.filter(n => n.isTravelling || n.isPC).forEach(n => {
+                if(n.isTempCombatant) return;
                 const tagStr = n.tagline ? ` [${n.tagline}]` : '';
                 const statusStr = (n.statuses && n.statuses.length > 0) ? ` {Status: ${n.statuses.join(', ')}}` : '';
-                log += `- ${n.name}${tagStr}${statusStr}\n  Hometown: ${n.hometown}\n  ${n.description}\n\n`;
+                const hometownStr = n.hometown ? `\n  Hometown: ${n.hometown}` : '';
+                const descStr = n.description ? `\n  ${n.description}` : '';
+                log += `- ${n.name}${tagStr}${statusStr}${hometownStr}${descStr}\n\n`;
             });
 
             log += `OTHER NOTABLE NPCS:\n`;
             state.entities.filter(n => !n.isTravelling && !n.isPC).forEach(n => {
+                if(n.isTempCombatant) return;
                 const tagStr = n.tagline ? ` [${n.tagline}]` : '';
-                log += `- ${n.name}${tagStr}: ${n.description}\n`;
+                const descStr = n.description ? `: ${n.description}` : '';
+                log += `- ${n.name}${tagStr}${descStr}\n`;
             });
 
             navigator.clipboard.writeText(log).then(() => {
