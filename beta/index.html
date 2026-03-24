@@ -68,6 +68,7 @@
         button.cloud-btn { background: #2c3e50; color: white; border: 1px solid #555; }
         button.cloud-btn.pull { background: #1abc9c; border: none; }
         button.view-btn { background: #45b7d1; color: #111; }
+        button.session-btn { background: #d35400; color: white; }
         
         /* Login States */
         button.login-btn { background: #f39c12; color: #111; }
@@ -120,6 +121,8 @@
             <button class="combat-btn" id="combat-toggle-btn" onclick="toggleCombat()">⚔️ Toggle Combat</button>
             <button class="add-btn" id="add-combatant-btn" onclick="openCombatantModal()" style="display:none; background:#e67e22; color:white;">+ Add Combatant</button>
             <button class="rest-btn" onclick="triggerLongRest()">🏕️ Long Rest</button>
+            
+            <button class="session-btn" onclick="exportStartOfGame()">📜 Start of Game Summary</button>
             
             <button class="cloud-btn pull" onclick="pullFromCloud()">☁️ Pull Data</button>
             <button class="cloud-btn" onclick="syncToCloud()">☁️ Force Sync</button>
@@ -503,7 +506,6 @@ function doPost(e) {
             const currentVal = filter.value;
             filter.innerHTML = '<option value="">Sort by Hometown...</option>';
             
-            // Extract unique hometowns dynamically
             const uniqueHometowns = [...new Set(state.entities.map(e => e.hometown).filter(h => h && h.trim() !== ''))].sort();
             
             uniqueHometowns.forEach(h => {
@@ -895,7 +897,7 @@ function doPost(e) {
         }
 
         function renderAll() {
-            updateHometownDropdown(); // Ensure filter list is always current
+            updateHometownDropdown(); 
             
             const container = document.getElementById('npc-grid');
             const selectedHometown = document.getElementById('hometown-filter').value;
@@ -908,7 +910,7 @@ function doPost(e) {
                     return (b.initiative || 0) - (a.initiative || 0);
                 }
                 const getPriority = (ent) => {
-                    if (ent.isTempCombatant) return 0; // Hide from standard view
+                    if (ent.isTempCombatant) return 0; 
                     if (ent.isTravelling) return 4; 
                     if (ent.isPC) return 3; 
                     if (ent.hometown === selectedHometown) return 2; 
@@ -935,7 +937,6 @@ function doPost(e) {
                 `;
 
                 displayList.forEach(ent => {
-                    // Do not show temp combatants when not in combat mode
                     if(!state.combatMode && ent.isTempCombatant) return;
 
                     const isOwner = (state.currentUser === ent.createdBy) || (state.currentCharacter && ent.name === state.currentCharacter);
@@ -1081,7 +1082,6 @@ function doPost(e) {
                 btn.innerText = "⚔️ Toggle Combat";
                 addBtn.style.display = "none";
                 
-                // Clear initiatives and drop temp combatants
                 state.entities = state.entities.filter(e => !e.isTempCombatant);
                 state.entities.forEach(e => e.initiative = 0);
                 triggerAutoSync();
@@ -1109,7 +1109,7 @@ function doPost(e) {
             });
             
             closeModal('combatant-modal');
-            triggerAutoSync(); // Note: temp combatants are saved locally but stripped out before cloud sync
+            triggerAutoSync(); 
             renderAll();
         }
 
@@ -1218,8 +1218,8 @@ function doPost(e) {
         }
 
         // --- EXPORT LOGIC ---
-        function exportSessionLog() {
-            let log = `WEEKLY GAME SESSION LOG\n========================\n\n`;
+        function exportStartOfGame() {
+            let log = `START OF GAME SUMMARY\n========================\n\n`;
             
             log += `ACTIVE PARTY & COMPANIONS:\n`;
             state.entities.filter(n => n.isTravelling || n.isPC).forEach(n => {
@@ -1231,16 +1231,8 @@ function doPost(e) {
                 log += `- ${n.name}${tagStr}${statusStr}${hometownStr}${descStr}\n\n`;
             });
 
-            log += `OTHER NOTABLE NPCS:\n`;
-            state.entities.filter(n => !n.isTravelling && !n.isPC).forEach(n => {
-                if(n.isTempCombatant) return;
-                const tagStr = n.tagline ? ` [${n.tagline}]` : '';
-                const descStr = n.description ? `: ${n.description}` : '';
-                log += `- ${n.name}${tagStr}${descStr}\n`;
-            });
-
             navigator.clipboard.writeText(log).then(() => {
-                showToast("Session log copied to your clipboard successfully!", "success");
+                showToast("Start of Game summary copied to clipboard!", "success");
             }).catch(err => {
                 showToast("Could not copy to clipboard. Check browser permissions.", "error");
             });
