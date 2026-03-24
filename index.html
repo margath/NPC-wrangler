@@ -1,0 +1,1260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NPC & PC Tracker - Version 1.0</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    
+    <style>
+        /* Base styles */
+        body { font-family: system-ui, -apple-system, sans-serif; margin: 0; background-color: #1e1e24; color: #e0e0e0; display: flex; flex-direction: column; min-height: 100vh; overflow-x: hidden; }
+        header { background: #2b2b36; padding: 15px 30px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #444; flex-wrap: wrap; gap: 15px; }
+        
+        /* Layout Containers */
+        .grid-view { padding: 30px; display: grid; gap: 20px; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); }
+        .table-container { padding: 30px; overflow-x: auto; }
+        
+        /* Card Styles */
+        .npc-card { background: #2a2a35; border-radius: 10px; border: 1px solid #444; position: relative; display: flex; flex-direction: column; overflow: hidden; transition: transform 0.2s; }
+        .npc-card.pc { border: 2px solid #f1c40f; box-shadow: 0 0 10px rgba(241, 196, 15, 0.2); }
+        .npc-card.travelling { border: 2px solid #2ecc71; box-shadow: 0 0 10px rgba(46, 204, 113, 0.2); }
+        .npc-card.hometown-focus { border: 2px solid #3498db; }
+        .npc-card.dead { opacity: 0.6; filter: grayscale(0.8); }
+        .card-content { padding: 15px; flex-grow: 1; }
+        
+        .npc-name { font-size: 20px; margin: 0; color: #fff; display: flex; justify-content: space-between; align-items: center; }
+        .npc-meta { font-size: 12px; color: #3498db; font-weight: bold; text-transform: uppercase; margin-bottom: 8px; }
+        .npc-tagline { font-size: 13px; color: #bdc3c7; font-style: italic; margin-bottom: 5px; }
+        .description-box { background: #1a1a20; padding: 10px; border-radius: 4px; font-size: 13px; margin: 10px 0; border: 1px solid #333; min-height: 40px; }
+        .secret-box { background: #2d1b2d; border: 1px solid #9b59b6; color: #d192e8; padding: 10px; border-radius: 4px; font-size: 13px; font-style: italic; margin-bottom: 10px; }
+        
+        /* Table Styles */
+        .table-view { width: 100%; border-collapse: collapse; background: #2a2a35; border-radius: 8px; overflow: hidden; font-size: 14px; }
+        .table-view th, .table-view td { padding: 12px 15px; border-bottom: 1px solid #444; text-align: left; vertical-align: top; }
+        .table-view th { background: #1a1a20; color: #3498db; text-transform: uppercase; font-size: 12px; font-weight: bold; }
+        .table-view tr:last-child td { border-bottom: none; }
+        .table-view tr:hover { background: #333340; }
+        .table-view tr.dead { opacity: 0.6; filter: grayscale(0.8); }
+
+        /* Badges & Statuses */
+        .badge { padding: 2px 6px; border-radius: 4px; font-size: 10px; margin-left: 5px; vertical-align: middle; font-weight: bold; color: #000; }
+        .badge-pc { background: #f1c40f; }
+        .badge-travelling { background: #2ecc71; }
+        .badge-temp { background: #e67e22; color: white; }
+        .status-container { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 10px; }
+        .status-pill { background: #e74c3c; color: white; padding: 3px 8px; border-radius: 12px; font-size: 11px; font-weight: bold; white-space: nowrap; }
+        .status-pill.revived { background: #e67e22; }
+        
+        /* Forms & Inputs */
+        input, select, textarea { width: 100%; padding: 8px; margin: 5px 0; border-radius: 4px; border: 1px solid #444; background: #1a1a20; color: white; box-sizing: border-box; font-family: inherit; }
+        .checkbox-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; background: #1a1a20; padding: 10px; border-radius: 4px; border: 1px solid #444; max-height: 150px; overflow-y: auto; }
+        .checkbox-grid label { font-size: 12px; display: flex; align-items: center; gap: 5px; cursor: pointer; }
+        .checkbox-grid input[type="checkbox"] { width: auto; margin: 0; }
+
+        /* Buttons & UI */
+        .controls { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+        .controls select, .controls button { height: 38px; box-sizing: border-box; margin: 0; padding: 0 15px; font-size: 14px; border-radius: 4px; border: none; font-weight: bold; cursor: pointer; transition: opacity 0.2s, background 0.2s; display: inline-flex; align-items: center; justify-content: center; }
+        .controls select { width: auto; background: #1a1a20; border: 1px solid #444; color: white; }
+        
+        button.add-btn { background: #2ecc71; color: #111; }
+        button.dm-btn { background: #9b59b6; color: white; }
+        button.setup-btn { background: #8e44ad; color: white; }
+        button.disconnect-btn { background: #555; color: white; display: none; }
+        button.combat-btn { background: #e74c3c; color: white; }
+        button.combat-btn.active { background: #c0392b; border: 2px solid #fff; }
+        button.rest-btn { background: #3498db; color: white; }
+        button.cloud-btn { background: #2c3e50; color: white; border: 1px solid #555; }
+        button.cloud-btn.pull { background: #1abc9c; border: none; }
+        button.view-btn { background: #45b7d1; color: #111; }
+        button.session-btn { background: #d35400; color: white; }
+        
+        /* Login States */
+        button.login-btn { background: #f39c12; color: #111; }
+        button.elevate-btn { background: #9b59b6; color: white; display: none; }
+        button.logout-btn { background: #e74c3c; color: white; display: none; }
+        
+        /* Initiative */
+        .init-box { display: flex; align-items: center; gap: 5px; background: #1a1a20; padding: 5px; border-radius: 4px; border: 1px solid #444; margin-top: 10px; }
+        .init-box input { width: 60px; margin: 0; text-align: center; font-weight: bold; font-size: 16px; }
+        
+        /* Modals */
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 1000; display: none; justify-content: center; align-items: center; backdrop-filter: blur(3px); }
+        .modal-box { background: #2a2a35; padding: 25px; border-radius: 8px; width: 90%; max-width: 600px; max-height: 90vh; overflow-y: auto; position: relative; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+        
+        /* Setup Instructions Specifics */
+        .instructions-box { background: #1a1a20; padding: 15px; border-radius: 6px; border: 1px solid #444; font-size: 13px; line-height: 1.5; margin: 15px 0; color: #bdc3c7; max-height: 400px; overflow-y: auto; }
+        .instructions-box h3 { color: #f1c40f; margin-top: 0; }
+        .error-text { color: #e74c3c; font-weight: bold; margin-bottom: 15px; display: none; background: #4a1919; padding: 10px; border-radius: 4px; border: 1px solid #e74c3c; }
+
+        /* Toast Notifications */
+        #toast-container { position: fixed; bottom: 30px; right: 30px; z-index: 9999; display: flex; flex-direction: column; gap: 10px; pointer-events: none; }
+        .toast { background: #2a2a35; border-left: 5px solid #3498db; color: white; padding: 15px 25px; border-radius: 6px; box-shadow: 0 5px 15px rgba(0,0,0,0.4); font-size: 14px; font-weight: 500; animation: slideIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; opacity: 1; transition: opacity 0.3s; display: flex; align-items: center; gap: 10px; }
+        .toast.success { border-color: #2ecc71; }
+        .toast.error { border-color: #e74c3c; }
+        .toast.info { border-color: #3498db; }
+        @keyframes slideIn { from { transform: translateX(120%); } to { transform: translateX(0); } }
+
+        /* Header Specifics */
+        .header-left { display: flex; align-items: center; gap: 15px; }
+        .qr-container { background: white; padding: 4px; border-radius: 4px; cursor: pointer; transition: transform 0.2s; display: flex; justify-content: center; align-items: center; min-width: 45px; min-height: 45px;}
+        .qr-container:hover { transform: scale(1.05); }
+    </style>
+</head>
+<body>
+
+    <div id="toast-container"></div>
+
+    <header>
+        <div class="header-left">
+            <a href="https://tools.gameportal.win/" target="_blank" title="Go to Game Portal" class="qr-container">
+                <img src="https://api.qrserver.com/v1/create-qr-code/?size=90x90&data=https://tools.gameportal.win/&margin=0" alt="Game Portal QR" width="45" height="45" style="display: block;">
+            </a>
+            <h1 style="margin: 0; font-size: 24px;">👤 NPC Tracker <span style="font-size: 12px; color: #888;">v1.0</span></h1>
+        </div>
+        <div class="controls">
+            <select id="hometown-filter" onchange="renderAll()">
+                <option value="">Sort by Hometown...</option>
+            </select>
+            <button class="view-btn" onclick="toggleView()">🗂️ Toggle View</button>
+            <button class="combat-btn" id="combat-toggle-btn" onclick="toggleCombat()">⚔️ Toggle Combat</button>
+            <button class="add-btn" id="add-combatant-btn" onclick="openCombatantModal()" style="display:none; background:#e67e22; color:white;">+ Add Combatant</button>
+            <button class="rest-btn" onclick="triggerLongRest()">🏕️ Long Rest</button>
+            
+            <button class="session-btn" onclick="exportStartOfGame()">📜 Start of Game Summary</button>
+            
+            <button class="cloud-btn pull" onclick="pullFromCloud()">☁️ Pull Data</button>
+            <button class="cloud-btn" onclick="syncToCloud()">☁️ Force Sync</button>
+            
+            <button class="add-btn" onclick="openAddModal()">+ New PC/NPC</button>
+            
+            <button class="login-btn" id="login-btn" onclick="openLoginModal()">Login</button>
+            <button class="elevate-btn" id="elevate-btn" onclick="elevateToDM()">👑 Elevate DM</button>
+            <button class="logout-btn" id="logout-btn" onclick="logout()">Logout</button>
+            
+            <button class="setup-btn" id="setup-btn" onclick="openSetupModal()">⚙️ Setup / Share</button>
+            <button class="disconnect-btn" id="disconnect-btn" onclick="handleDisconnect()">🔌 Disconnect</button>
+        </div>
+    </header>
+
+    <main id="npc-grid" class="grid-view"></main>
+
+    <div id="confirm-modal" class="modal-overlay">
+        <div class="modal-box" style="max-width: 400px; text-align: center;">
+            <h2 id="confirm-title" style="margin-top: 0; color: #f1c40f;">Are you sure?</h2>
+            <p id="confirm-msg" style="font-size: 15px; color: #ccc; line-height: 1.4;"></p>
+            <div style="display:flex; gap: 10px; margin-top: 25px;">
+                <button id="confirm-yes-btn" class="add-btn" style="flex:1; height: 40px; font-size: 16px;">Yes, Proceed</button>
+                <button onclick="closeModal('confirm-modal')" style="background:#555; color:white; flex:1; height: 40px; font-size: 16px; border:none; border-radius:4px; cursor:pointer;">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="prompt-modal" class="modal-overlay">
+        <div class="modal-box" style="max-width: 300px; text-align: center;">
+            <h2 style="margin-top: 0; color: #9b59b6;">👑 DM Elevation</h2>
+            <p style="font-size: 13px; color: #ccc; margin-bottom: 20px;">Please enter your PIN again to verify DM access.</p>
+            <input type="password" id="prompt-pin-input" placeholder="Enter PIN" style="text-align: center; font-size: 18px; letter-spacing: 2px;">
+            <div style="display:flex; gap: 10px; margin-top: 20px;">
+                <button id="prompt-submit-btn" class="elevate-btn" style="flex:1; display:block; height: 40px;">Verify</button>
+                <button onclick="closeModal('prompt-modal')" style="background:#555; color:white; flex:1; height: 40px; border:none; border-radius:4px; cursor:pointer;">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="combatant-modal" class="modal-overlay">
+        <div class="modal-box" style="max-width: 300px;">
+            <h2 style="margin-top: 0;">Add Combatant</h2>
+            <input type="text" id="c-name" placeholder="Name (e.g. Goblin 1)">
+            <input type="number" id="c-init" placeholder="Initiative" value="0">
+            <div style="display:flex; gap: 10px; margin-top: 15px;">
+                <button onclick="saveCombatant()" class="add-btn" style="flex:1; height: 40px;">Add</button>
+                <button onclick="closeModal('combatant-modal')" style="background:#555; color:white; flex:1; height: 40px; border:none; border-radius:4px; cursor:pointer;">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="npc-modal" class="modal-overlay">
+        <div class="modal-box">
+            <h2 id="modal-title">Add PC/NPC</h2>
+            
+            <label style="font-size: 14px; font-weight: bold; margin-bottom: 10px; display: block;">
+                <input type="checkbox" id="f-isPC" style="width: auto;"> Is this a Player Character (PC)?
+            </label>
+
+            <input type="text" id="f-name" placeholder="Name">
+            <input type="text" id="f-tagline" placeholder="Tagline (e.g. 'The brooding rogue')">
+            <input type="text" id="f-hometown" placeholder="Hometown (Adds to dropdown filter)">
+            <textarea id="f-description" placeholder="Public Description"></textarea>
+            <textarea id="f-secret" placeholder="Secret (DM/Owner Only)"></textarea>
+            
+            <label style="font-size: 12px; margin-top: 10px; display: block;">
+                <input type="checkbox" id="f-travelling" style="width: auto;"> Currently travelling with party?
+            </label>
+
+            <h4 style="margin: 15px 0 5px 0;">Statuses</h4>
+            <div class="checkbox-grid" id="status-grid">
+                </div>
+
+            <div style="display:flex; gap: 10px; margin-top: 20px;">
+                <button onclick="saveEntity()" class="add-btn" style="flex:1; height: 40px;">Save</button>
+                <button onclick="closeModal('npc-modal')" style="background:#555; color:white; height: 40px;">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="login-modal" class="modal-overlay">
+        <div class="modal-box" style="max-width: 300px;">
+            <h2 style="margin-top: 0; color: #f39c12;">Player Login</h2>
+            <select id="login-player-select">
+                <option value="">Select Player...</option>
+                </select>
+            <input type="password" id="login-pin" placeholder="Enter PIN">
+            <div style="display:flex; gap: 10px; margin-top: 20px;">
+                <button onclick="attemptLogin()" class="login-btn" style="flex:1; height: 40px;">Login</button>
+                <button onclick="closeModal('login-modal')" style="background:#555; color:white; flex:1; height: 40px; border:none; border-radius:4px;">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="setup-modal" class="modal-overlay">
+        <div class="modal-box">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                <h2 style="margin: 0; color: #3498db;">🔌 Database Setup & Share</h2>
+                <button onclick="closeModal('setup-modal')" style="background: none; border: none; color: #aaa; font-size: 28px; cursor: pointer; line-height: 1;">&times;</button>
+            </div>
+            
+            <div id="setup-error-msg" class="error-text"></div>
+            
+            <div style="display: flex; gap: 20px; align-items: flex-start;">
+                <div style="flex: 1;">
+                    <p style="font-size: 14px; margin-top: 0;">Provide your Google Apps Script Web App URL to sync data for this session. This URL is temporarily saved in your browser and wiped when closed.</p>
+                    <input type="text" id="setup-gas-url" placeholder="https://script.google.com/macros/s/.../exec">
+                    <button onclick="applyGasUrl()" class="add-btn" style="width: 100%; margin-top: 10px; height: 40px;">Connect & Load Database</button>
+                </div>
+                
+                <div id="qr-section" style="display: none; text-align: center; background: #1a1a20; padding: 15px; border-radius: 6px; border: 1px solid #444; min-width: 110px;">
+                    <div id="share-qrcode" style="background: white; padding: 5px; display: inline-block; margin-bottom: 5px; border-radius: 4px;"></div>
+                    <div style="font-size: 11px; color: #bdc3c7; font-weight: bold; text-transform: uppercase;">Scan to Join</div>
+                    <div style="margin-top: 10px;">
+                        <button onclick="copyDiscordLink()" id="discord-copy-btn" style="background: #5865F2; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 11px; font-weight: bold; width: 100%;">
+                            🔗 Copy Link
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="instructions-box">
+                <h3>🛠️ Setup Instructions for the DM</h3>
+                <p>To use this tracker, you need to link it to a Google Sheet using Google Apps Script.</p>
+                <ol>
+                    <li><strong>Set Up the Google Sheet:</strong>
+                        <ul>
+                            <li>Create a new Google Sheet.</li>
+                            <li>Add two tabs at the bottom. Name the first one <strong>NPCs</strong> and the second one <strong>PCs</strong>.</li>
+                            <li>In the <strong>PCs</strong> sheet, type <code>PlayerName</code>, <code>CharacterName</code>, and <code>PIN</code> as column headers to create player logins.</li>
+                            <li><strong style="color:#e74c3c;">IMPORTANT:</strong> Select the entire <code>PIN</code> column, click <strong>Format &gt; Number &gt; Plain Text</strong>. This ensures PINs with leading zeros (e.g. '0012') are preserved properly!</li>
+                        </ul>
+                    </li>
+                    <li style="margin-top: 10px;"><strong>Add the Code:</strong>
+                        <ul>
+                            <li>Click <strong>Extensions &gt; Apps Script</strong>.</li>
+                            <li>Paste the provided database script below (replacing any existing code).</li>
+                            
+                            <div style="position: relative; margin: 10px 0;">
+                                <textarea id="gas-script-code" readonly style="width: 100%; height: 160px; font-family: monospace; font-size: 11px; background: #111; color: #2ecc71; padding: 10px; border: 1px solid #444; border-radius: 4px; resize: vertical;">
+const NPC_SHEET = "NPCs";
+const PC_SHEET = "PCs";
+const BACKEND_VERSION = "1.0";
+const DB_TYPE = "NPC Database";
+
+function doGet(e) {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const getSheetData = (sheetName) => {
+      let s = ss.getSheetByName(sheetName);
+      let arr = [];
+      if (s) {
+        let data = s.getDataRange().getValues();
+        if (data.length > 1) {
+          let headers = data[0];
+          for (let i = 1; i < data.length; i++) {
+            let obj = {};
+            headers.forEach((h, idx) => { 
+                let val = data[i][idx];
+                try { 
+                    if (typeof val === 'string' && (val.startsWith('[') || val.startsWith('{'))) {
+                        obj[h] = JSON.parse(val); 
+                    } else {
+                        obj[h] = val;
+                    }
+                }
+                catch(e) { obj[h] = val; }
+            });
+            arr.push(obj);
+          }
+        }
+      }
+      return arr;
+    };
+    return ContentService.createTextOutput(JSON.stringify({
+        dbType: DB_TYPE, 
+        backendVersion: BACKEND_VERSION, 
+        npcs: getSheetData(NPC_SHEET), 
+        pcs: getSheetData(PC_SHEET)
+    })).setMimeType(ContentService.MimeType.JSON);
+  } catch(err) {
+    return ContentService.createTextOutput(JSON.stringify({error: err.toString()})).setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+function doPost(e) {
+  try {
+    const p = JSON.parse(e.postData.contents);
+    if (p.action === 'saveData') {
+        const saveSheet = (sheetName, dataArray) => {
+            let ss = SpreadsheetApp.getActiveSpreadsheet();
+            let s = ss.getSheetByName(sheetName);
+            if(!s) s = ss.insertSheet(sheetName);
+            s.clear();
+            if(dataArray && dataArray.length > 0) {
+                // Collect all unique headers to ensure no missing columns
+                let headerSet = new Set();
+                dataArray.forEach(item => Object.keys(item).forEach(k => headerSet.add(k)));
+                let headers = Array.from(headerSet);
+                let rows = [headers];
+                
+                dataArray.forEach(item => { 
+                    rows.push(headers.map(h => {
+                        let val = item[h];
+                        if (val === undefined || val === null) return "";
+                        if (typeof val === 'boolean') return val ? "TRUE" : "FALSE";
+                        if (typeof val === 'object') return JSON.stringify(val);
+                        return val;
+                    })); 
+                });
+                s.getRange(1, 1, rows.length, headers.length).setValues(rows);
+            }
+        };
+        saveSheet(NPC_SHEET, p.npcs);
+        saveSheet(PC_SHEET, p.pcs);
+        return ContentService.createTextOutput(JSON.stringify({status: "success"})).setMimeType(ContentService.MimeType.JSON);
+    }
+  } catch(err) {
+    return ContentService.createTextOutput(JSON.stringify({error: err.toString()})).setMimeType(ContentService.MimeType.JSON);
+  }
+}
+                                </textarea>
+                                <button onclick="copyGasScript()" style="position: absolute; top: 10px; right: 20px; background: #3498db; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 11px; font-weight: bold;">📋 Copy Script</button>
+                            </div>
+                            <li>Click the <strong>Save</strong> icon.</li>
+                        </ul>
+                    </li>
+                    <li style="margin-top: 10px;"><strong>Deploy the Web App:</strong>
+                        <ul>
+                            <li>In the top right corner, click <strong>Deploy &gt; New deployment</strong>.</li>
+                            <li>Click the gear icon ⚙️ next to "Select type" and choose <strong>Web app</strong>.</li>
+                            <li>Under "Execute as", select <strong>Me</strong>.</li>
+                            <li>Under "Who has access", select <strong>Anyone</strong>.</li>
+                            <li>Click <strong>Deploy</strong> and authorize permissions.</li>
+                        </ul>
+                    </li>
+                    <li style="margin-top: 10px;"><strong>Link the App:</strong>
+                        <ul>
+                            <li>Copy the <strong>Web app URL</strong> provided by Google.</li>
+                            <li>Paste it into the input box above!</li>
+                        </ul>
+                    </li>
+                </ol>
+            </div>
+            <button onclick="closeModal('setup-modal')" style="width: 100%; background:#555; color:white; padding: 8px; border:none; border-radius: 4px; cursor: pointer;">Work Offline (Local Storage Only)</button>
+        </div>
+    </div>
+
+    <script>
+        // --- CONSTANTS & DATA ---
+        let GAS_WEB_APP_URL = null; 
+        
+        const STATUSES = [
+            "Blinded", "Charmed", "Deafened", "Frightened", "Grappled", 
+            "Incapacitated", "Invisible", "Paralyzed", "Petrified", "Poisoned", 
+            "Prone", "Restrained", "Stunned", "Unconscious", "Exhaustion", 
+            "Dead", "Revived -3", "Revived -2", "Revived -1"
+        ];
+
+        // --- STATE MANAGEMENT ---
+        const state = {
+            entities: [],
+            currentUser: null, 
+            currentCharacter: null, 
+            currentPin: null, 
+            isDM: false,
+            combatMode: false,
+            playersFromSheet: [],
+            viewMode: 'grid' 
+        };
+
+        // --- CUSTOM NOTIFICATIONS & MODALS ---
+        function showToast(message, type = 'success') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            
+            let icon = '✅';
+            if (type === 'error') icon = '❌';
+            if (type === 'info') icon = 'ℹ️';
+            
+            toast.innerHTML = `<span>${icon}</span> <span>${message}</span>`;
+            container.appendChild(toast);
+            
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
+        function showConfirm(title, message, onConfirmCallback) {
+            document.getElementById('confirm-title').innerText = title;
+            document.getElementById('confirm-msg').innerText = message;
+            document.getElementById('confirm-modal').style.display = 'flex';
+            
+            const yesBtn = document.getElementById('confirm-yes-btn');
+            const newYesBtn = yesBtn.cloneNode(true);
+            yesBtn.parentNode.replaceChild(newYesBtn, yesBtn);
+            
+            newYesBtn.onclick = () => {
+                closeModal('confirm-modal');
+                onConfirmCallback();
+            };
+        }
+
+        function showPromptModal(onSubmitCallback) {
+            const input = document.getElementById('prompt-pin-input');
+            input.value = '';
+            document.getElementById('prompt-modal').style.display = 'flex';
+            input.focus();
+            
+            const submitBtn = document.getElementById('prompt-submit-btn');
+            const newSubmitBtn = submitBtn.cloneNode(true);
+            submitBtn.parentNode.replaceChild(newSubmitBtn, submitBtn);
+            
+            newSubmitBtn.onclick = () => {
+                closeModal('prompt-modal');
+                onSubmitCallback(document.getElementById('prompt-pin-input').value);
+            };
+        }
+
+        // --- URL COMPRESSION & OBFUSCATION ---
+        function encodeGasUrl(url) {
+            try {
+                let match = url.match(/\/s\/([^/]+)\/exec/);
+                let payload = match ? "ID|" + match[1] : "URL|" + url;
+                return btoa(payload).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+            } catch(e) { return ""; }
+        }
+
+        function decodeGasUrl(encoded) {
+            try {
+                let str = encoded.replace(/-/g, '+').replace(/_/g, '/');
+                while (str.length % 4) str += '=';
+                let decoded = atob(str);
+                
+                if (decoded.startsWith("ID|")) {
+                    return "https://script.google.com/macros/s/" + decoded.substring(3) + "/exec";
+                } else if (decoded.startsWith("URL|")) {
+                    return decoded.substring(4);
+                }
+                return null;
+            } catch(e) { return null; }
+        }
+
+        // --- INIT & SETUP LOGIC ---
+        function init() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const dbParam = urlParams.get('db'); 
+            
+            if (dbParam) {
+                const decodedUrl = decodeGasUrl(dbParam);
+                if(decodedUrl) {
+                    sessionStorage.setItem('GAS_WEB_APP_URL', decodedUrl);
+                }
+                window.history.replaceState({}, document.title, window.location.pathname);
+            }
+
+            GAS_WEB_APP_URL = sessionStorage.getItem('GAS_WEB_APP_URL');
+
+            const statusGrid = document.getElementById('status-grid');
+            STATUSES.forEach(s => {
+                statusGrid.innerHTML += `<label><input type="checkbox" value="${s}" class="status-cb"> ${s}</label>`;
+            });
+
+            checkDatabaseVersion();
+            updateLoginUI();
+            updateConnectionUI();
+
+            if (GAS_WEB_APP_URL) {
+                fetchCloudData(true, true); // Silent pull on load
+            } else {
+                openSetupModal();
+                renderAll();
+            }
+        }
+
+        function updateHometownDropdown() {
+            const filter = document.getElementById('hometown-filter');
+            const currentVal = filter.value;
+            filter.innerHTML = '<option value="">Sort by Hometown...</option>';
+            
+            const uniqueHometowns = [...new Set(state.entities.map(e => e.hometown).filter(h => h && h.trim() !== ''))].sort();
+            
+            uniqueHometowns.forEach(h => {
+                const opt = document.createElement('option');
+                opt.value = h; opt.innerText = h;
+                filter.appendChild(opt);
+            });
+            filter.value = currentVal; 
+        }
+
+        function updateConnectionUI() {
+            const setupBtn = document.getElementById('setup-btn');
+            const disconnectBtn = document.getElementById('disconnect-btn');
+            if (GAS_WEB_APP_URL) {
+                setupBtn.innerText = "⚙️ Share QR";
+                disconnectBtn.style.display = "inline-flex";
+            } else {
+                setupBtn.innerText = "⚙️ Setup DB";
+                disconnectBtn.style.display = "none";
+            }
+        }
+
+        // --- DISCONNECT LOGIC ---
+        let disconnectArmed = false;
+        function handleDisconnect() {
+            const btn = document.getElementById('disconnect-btn');
+            
+            if (!disconnectArmed) {
+                disconnectArmed = true;
+                btn.innerText = "Wait...";
+                btn.style.background = "#c0392b";
+                btn.disabled = true; 
+                
+                setTimeout(() => {
+                    btn.innerText = "⚠️ Confirm Disconnect";
+                    btn.disabled = false;
+                }, 1000); 
+                
+                setTimeout(() => {
+                    if(disconnectArmed) {
+                        disconnectArmed = false;
+                        btn.innerText = "🔌 Disconnect";
+                        btn.style.background = "#555";
+                    }
+                }, 5000);
+                
+            } else {
+                disconnectArmed = false;
+                sessionStorage.removeItem('GAS_WEB_APP_URL');
+                GAS_WEB_APP_URL = null;
+                
+                btn.innerText = "🔌 Disconnect";
+                btn.style.background = "#555";
+                updateConnectionUI();
+                
+                window.history.replaceState({}, document.title, window.location.pathname);
+                showToast("Disconnected from Cloud Database. Working locally.", "info");
+            }
+        }
+
+        function openSetupModal() {
+            document.getElementById('setup-modal').style.display = 'flex';
+            document.getElementById('setup-error-msg').style.display = 'none';
+            document.getElementById('setup-gas-url').value = GAS_WEB_APP_URL || '';
+            
+            if (GAS_WEB_APP_URL) {
+                document.getElementById('qr-section').style.display = 'block';
+                generateShareQRCode();
+            } else {
+                document.getElementById('qr-section').style.display = 'none';
+            }
+        }
+
+        function showSetupModalWithError(errorMsg = null) {
+            openSetupModal();
+            const errorBox = document.getElementById('setup-error-msg');
+            if (errorMsg) {
+                errorBox.innerHTML = `⚠️ Database Error: <br><span style="font-weight:normal; font-size: 12px;">${errorMsg}</span>`;
+                errorBox.style.display = 'block';
+            }
+        }
+
+        function applyGasUrl() {
+            const url = document.getElementById('setup-gas-url').value.trim();
+            if (!url) {
+                showToast("Please enter a valid URL.", "error");
+                return;
+            }
+            
+            sessionStorage.setItem('GAS_WEB_APP_URL', url);
+            GAS_WEB_APP_URL = url;
+            
+            document.getElementById('setup-error-msg').style.display = 'none';
+            document.getElementById('qr-section').style.display = 'block';
+            generateShareQRCode();
+            updateConnectionUI();
+            
+            fetchCloudData(true, false);
+        }
+
+        function generateShareQRCode() {
+            const qrContainer = document.getElementById("share-qrcode");
+            qrContainer.innerHTML = ''; 
+            if (!GAS_WEB_APP_URL) return;
+
+            const shareableUrl = window.location.origin + window.location.pathname + "?db=" + encodeGasUrl(GAS_WEB_APP_URL);
+            
+            new QRCode(qrContainer, {
+                text: shareableUrl,
+                width: 90,
+                height: 90,
+                colorDark : "#000000",
+                colorLight : "#ffffff",
+                correctLevel : QRCode.CorrectLevel.L
+            });
+        }
+
+        function copyDiscordLink() {
+            if (!GAS_WEB_APP_URL) return;
+            const shareableUrl = window.location.origin + window.location.pathname + "?db=" + encodeGasUrl(GAS_WEB_APP_URL);
+            
+            navigator.clipboard.writeText(shareableUrl).then(() => {
+                const btn = document.getElementById('discord-copy-btn');
+                const originalText = btn.innerHTML;
+                btn.innerHTML = "✅ Copied!";
+                setTimeout(() => { btn.innerHTML = originalText; }, 2000);
+            }).catch(err => {
+                showToast("Failed to copy link. Check browser permissions.", "error");
+            });
+        }
+
+        function copyGasScript() {
+            const scriptText = document.getElementById('gas-script-code').value;
+            navigator.clipboard.writeText(scriptText).then(() => {
+                showToast("Script copied to clipboard!", "success");
+            }).catch(err => {
+                showToast("Failed to copy. Please select the text and copy manually.", "error");
+            });
+        }
+
+        // --- LOCAL DATABASE LOGIC ---
+        function checkDatabaseVersion() {
+            let dbData = localStorage.getItem('dndDatabase');
+            if (dbData) {
+                try {
+                    dbData = JSON.parse(dbData);
+                    if (dbData.type === 'NPC Database' && dbData.version === '1.0') {
+                        state.entities = dbData.entities || [];
+                        return;
+                    }
+                } catch (e) { console.error("Database parse error", e); }
+            }
+            state.entities = [];
+            saveLocalDatabase();
+        }
+
+        function saveLocalDatabase() {
+            const dbData = {
+                type: 'NPC Database',
+                version: '1.0',
+                entities: state.entities
+            };
+            localStorage.setItem('dndDatabase', JSON.stringify(dbData));
+        }
+
+        // --- AUTO SYNC WRAPPER ---
+        let syncTimeout = null;
+        function triggerAutoSync() {
+            saveLocalDatabase(); // Always save locally first
+            if (GAS_WEB_APP_URL) {
+                clearTimeout(syncTimeout);
+                // Wait 1 second after last change to push silently to cloud
+                syncTimeout = setTimeout(() => {
+                    syncToCloud(true);
+                }, 1000);
+            }
+        }
+
+        // --- GOOGLE APPS SCRIPT LOGIC (Cloud Sync & Logins) ---
+        async function fetchCloudData(overwriteLocal = false, silent = false) {
+            if (!GAS_WEB_APP_URL) return;
+            
+            try {
+                const response = await fetch(GAS_WEB_APP_URL);
+                const data = await response.json(); 
+                
+                if (data.dbType !== "NPC Database" || data.backendVersion !== "1.0") {
+                    throw new Error(`Invalid Database Signature. Expected Type: 'NPC Database', Version: '1.0'. Received Type: '${data.dbType}'`);
+                }
+
+                if (overwriteLocal && !silent) {
+                    closeModal('setup-modal');
+                }
+
+                if (data.pcs) {
+                    state.playersFromSheet = data.pcs.filter(p => p.PlayerName);
+                    populateLoginDropdown();
+                }
+
+                if (overwriteLocal) {
+                    const cloudPCs = (data.pcs || []).map(pc => ({
+                        ...pc, 
+                        isPC: true,
+                        name: pc.name || pc.CharacterName || "Unnamed PC",
+                        id: pc.id || 'pc_' + Date.now() + Math.floor(Math.random() * 1000)
+                    }));
+                    
+                    const cloudNPCs = (data.npcs || []).map(npc => ({
+                        ...npc, 
+                        isPC: false,
+                        name: npc.name || "Unnamed NPC",
+                        id: npc.id || 'npc_' + Date.now() + Math.floor(Math.random() * 1000)
+                    }));
+                    
+                    state.entities = [...cloudPCs, ...cloudNPCs];
+                    saveLocalDatabase();
+                    renderAll();
+                    if(!silent) showToast("Database successfully pulled and validated!", "success");
+                } else {
+                    (data.pcs || []).forEach(cloudPc => {
+                        const localPc = state.entities.find(e => e.id === cloudPc.id);
+                        if (localPc) {
+                            if (cloudPc.PlayerName) localPc.PlayerName = cloudPc.PlayerName;
+                            if (cloudPc.PIN) localPc.PIN = cloudPc.PIN;
+                        }
+                    });
+                }
+            } catch (e) {
+                console.error("Failed to fetch data:", e);
+                sessionStorage.removeItem('GAS_WEB_APP_URL');
+                GAS_WEB_APP_URL = null;
+                updateConnectionUI();
+                document.getElementById('qr-section').style.display = 'none';
+                if(!silent) showSetupModalWithError(e.message || "Failed to connect to the provided URL.");
+            }
+        }
+
+        function pullFromCloud() {
+            if (!GAS_WEB_APP_URL) {
+                showSetupModalWithError("Please connect a database first.");
+                return;
+            }
+            showConfirm("Pull Data from Cloud?", "This will overwrite your local changes with the data in Google Sheets. Proceed?", () => {
+                fetchCloudData(true, false);
+            });
+        }
+
+        async function syncToCloud(silent = false) {
+            if (!GAS_WEB_APP_URL) {
+                if(!silent) showSetupModalWithError("Please connect a database first.");
+                return;
+            }
+
+            // Exclude temp combatants from the cloud payload
+            const permanentEntities = state.entities.filter(e => !e.isTempCombatant);
+            const pcsArray = permanentEntities.filter(e => e.isPC);
+            const npcsArray = permanentEntities.filter(e => !e.isPC);
+
+            const payload = {
+                action: 'saveData',
+                pcs: pcsArray,
+                npcs: npcsArray
+            };
+
+            try {
+                const response = await fetch(GAS_WEB_APP_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                    body: JSON.stringify(payload)
+                });
+
+                const result = await response.json();
+                if (result.status === "success") {
+                    if(!silent) showToast("Successfully saved to Google Sheets!", "success");
+                } else {
+                    console.error("Cloud Error:", result.error);
+                    if(!silent) showToast("Cloud sync failed. Error: " + result.error, "error");
+                }
+            } catch (error) {
+                console.error("Network/Fetch Error:", error);
+                if(!silent) showToast("Network error during cloud sync.", "error");
+            }
+        }
+
+        // --- AUTH & LOGIN LOGIC ---
+        function populateLoginDropdown() {
+            const select = document.getElementById('login-player-select');
+            select.innerHTML = '<option value="">Select Player...</option>';
+            state.playersFromSheet.forEach(p => {
+                select.innerHTML += `<option value="${p.PlayerName}">${p.PlayerName} (${p.name || p.CharacterName || 'Unknown'})</option>`;
+            });
+        }
+
+        function openLoginModal() {
+            document.getElementById('login-modal').style.display = 'flex';
+            document.getElementById('login-pin').value = '';
+        }
+
+        function attemptLogin() {
+            const playerName = document.getElementById('login-player-select').value;
+            const inputPin = document.getElementById('login-pin').value.trim();
+            
+            if (!playerName) {
+                showToast("Select a player!", "error");
+                return;
+            }
+            
+            const playerRec = state.playersFromSheet.find(p => p.PlayerName === playerName);
+            
+            if (playerRec && String(playerRec.PIN).trim() === inputPin) {
+                state.currentUser = playerRec.PlayerName;
+                state.currentCharacter = playerRec.name || playerRec.CharacterName;
+                state.currentPin = inputPin;
+                state.isDM = false; 
+                updateLoginUI();
+                closeModal('login-modal');
+                renderAll();
+                showToast(`Welcome back, ${state.currentUser}!`, "success");
+                
+                // Silent pull to ensure they have the absolute latest data from the DM upon login
+                if(GAS_WEB_APP_URL) fetchCloudData(true, true);
+                
+            } else {
+                showToast("Incorrect PIN.", "error");
+            }
+        }
+
+        function elevateToDM() {
+            if (state.isDM) {
+                state.isDM = false;
+                updateLoginUI();
+                renderAll();
+                showToast("DM status dropped.", "info");
+                return;
+            }
+            
+            showPromptModal((enteredPin) => {
+                if (enteredPin.trim() === state.currentPin) {
+                    state.isDM = true;
+                    updateLoginUI();
+                    renderAll();
+                    showToast("Elevated to Game Master successfully!", "success");
+                } else {
+                    showToast("Incorrect PIN. Elevation denied.", "error");
+                }
+            });
+        }
+
+        function logout() {
+            state.currentUser = null;
+            state.currentCharacter = null;
+            state.currentPin = null;
+            state.isDM = false;
+            updateLoginUI();
+            renderAll();
+            showToast("Successfully logged out.", "info");
+        }
+
+        function updateLoginUI() {
+            const loginBtn = document.getElementById('login-btn');
+            const elevateBtn = document.getElementById('elevate-btn');
+            const logoutBtn = document.getElementById('logout-btn');
+            
+            if (state.currentUser) {
+                loginBtn.style.display = 'none';
+                elevateBtn.style.display = 'inline-flex';
+                logoutBtn.style.display = 'inline-flex';
+                
+                logoutBtn.innerText = `Logout (${state.currentUser})`;
+                
+                if (state.isDM) {
+                    elevateBtn.innerText = "🛑 Drop DM Status";
+                    elevateBtn.style.background = "#c0392b";
+                } else {
+                    elevateBtn.innerText = "👑 Elevate DM";
+                    elevateBtn.style.background = "#9b59b6";
+                }
+            } else {
+                loginBtn.style.display = 'inline-flex';
+                elevateBtn.style.display = 'none';
+                logoutBtn.style.display = 'none';
+            }
+        }
+
+        // --- RENDER & VIEW LOGIC ---
+        function toggleView() {
+            state.viewMode = state.viewMode === 'grid' ? 'table' : 'grid';
+            renderAll();
+        }
+
+        function renderAll() {
+            updateHometownDropdown(); 
+            
+            const container = document.getElementById('npc-grid');
+            const selectedHometown = document.getElementById('hometown-filter').value;
+            container.innerHTML = '';
+            
+            container.className = state.viewMode === 'grid' ? 'grid-view' : 'table-container';
+
+            const displayList = [...state.entities].sort((a, b) => {
+                if (state.combatMode) {
+                    return (b.initiative || 0) - (a.initiative || 0);
+                }
+                const getPriority = (ent) => {
+                    if (ent.isTempCombatant) return 0; 
+                    if (ent.isTravelling) return 4; 
+                    if (ent.isPC) return 3; 
+                    if (ent.hometown === selectedHometown) return 2; 
+                    return 1; 
+                };
+                return getPriority(b) - getPriority(a) || a.name.localeCompare(b.name);
+            });
+
+            if (state.viewMode === 'table') {
+                let tableHTML = `
+                    <table class="table-view">
+                        <thead>
+                            <tr>
+                                <th style="min-width: 150px;">Name / Identity</th>
+                                <th>Origin</th>
+                                <th>Tags</th>
+                                ${state.combatMode ? '<th style="text-align:center;">Init</th>' : ''}
+                                <th>Statuses</th>
+                                <th style="width: 30%;">Details</th>
+                                <th style="min-width: 120px;">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                `;
+
+                displayList.forEach(ent => {
+                    if(!state.combatMode && ent.isTempCombatant) return;
+
+                    const isOwner = (state.currentUser === ent.createdBy) || (state.currentCharacter && ent.name === state.currentCharacter);
+                    const canSeeSecret = state.isDM || isOwner;
+                    const isDead = ent.statuses && ent.statuses.includes("Dead");
+                    
+                    let tags = [];
+                    if (ent.isPC) tags.push('<span class="badge badge-pc">PC</span>');
+                    if (ent.isTravelling) tags.push('<span class="badge badge-travelling">PARTY</span>');
+                    if (ent.isTempCombatant) tags.push('<span class="badge badge-temp">TEMP</span>');
+
+                    let statusHTML = (ent.statuses || []).map(s => {
+                        let pClass = s.includes("Revived") ? 'status-pill revived' : 'status-pill';
+                        return `<span class="${pClass}">${s}</span>`;
+                    }).join(' ');
+
+                    let initHTML = '';
+                    if (state.combatMode) {
+                        const disabled = state.isDM || isOwner ? '' : 'disabled';
+                        initHTML = `<td style="text-align:center;"><input type="number" style="width:50px; text-align:center; padding:4px;" value="${ent.initiative || 0}" onchange="updateInitiative('${ent.id}', this.value)" ${disabled}></td>`;
+                    }
+
+                    let detailsStr = '';
+                    if (ent.description && ent.description.trim() !== '') {
+                        detailsStr += `<div style="font-size:12px; margin-bottom:5px;"><strong>Desc:</strong> ${ent.description}</div>`;
+                    }
+                    if (canSeeSecret && ent.secret && ent.secret.trim() !== '') {
+                        detailsStr += `<div style="font-size:12px; color:#d192e8;"><strong>Secret:</strong> ${ent.secret}</div>`;
+                    }
+
+                    let actionHTML = '';
+                    if (state.isDM || isOwner) {
+                        actionHTML = `
+                            ${!ent.isTempCombatant ? `<button onclick="editEntity('${ent.id}')" style="font-size:11px; background:#444; color:white; padding: 4px 8px; margin-right: 4px;">Edit</button>` : ''}
+                            <button onclick="deleteEntity('${ent.id}')" style="font-size:11px; background:#c0392b; color:white; padding: 4px 8px;">Del</button>
+                        `;
+                    }
+
+                    tableHTML += `
+                        <tr class="${isDead ? 'dead' : ''}">
+                            <td>
+                                <strong>${ent.name}</strong>
+                                ${ent.tagline && ent.tagline.trim() !== '' ? `<br><span style="font-size:11px; color:#aaa; font-style:italic;">"${ent.tagline}"</span>` : ''}
+                            </td>
+                            <td>${ent.hometown || ''}</td>
+                            <td>${tags.join('<br>')}</td>
+                            ${initHTML}
+                            <td><div class="status-container" style="margin:0;">${statusHTML}</div></td>
+                            <td>${detailsStr}</td>
+                            <td>${actionHTML}</td>
+                        </tr>
+                    `;
+                });
+                tableHTML += `</tbody></table>`;
+                container.innerHTML = tableHTML;
+
+            } else {
+                // GRID VIEW
+                displayList.forEach(ent => {
+                    if(!state.combatMode && ent.isTempCombatant) return;
+
+                    const isOwner = (state.currentUser === ent.createdBy) || (state.currentCharacter && ent.name === state.currentCharacter);
+                    const canSeeSecret = state.isDM || isOwner;
+                    const isDead = ent.statuses && ent.statuses.includes("Dead");
+                    
+                    let classes = ['npc-card'];
+                    if (ent.isPC) classes.push('pc');
+                    if (ent.isTravelling) classes.push('travelling');
+                    if (ent.isTempCombatant) classes.push('temp-combatant');
+                    if (ent.hometown === selectedHometown && !state.combatMode && !ent.isTempCombatant) classes.push('hometown-focus');
+                    if (isDead) classes.push('dead');
+
+                    const card = document.createElement('div');
+                    card.className = classes.join(' ');
+                    if(ent.isTempCombatant) card.style.border = "2px dashed #e67e22";
+                    
+                    let statusHTML = '';
+                    if (ent.statuses && ent.statuses.length > 0) {
+                        statusHTML = `<div class="status-container">` + 
+                            ent.statuses.map(s => {
+                                let pClass = s.includes("Revived") ? 'status-pill revived' : 'status-pill';
+                                return `<span class="${pClass}">${s}</span>`;
+                            }).join('') + `</div>`;
+                    }
+
+                    let initBoxHTML = '';
+                    if (state.combatMode) {
+                        const disabled = state.isDM || isOwner ? '' : 'disabled';
+                        initBoxHTML = `
+                            <div class="init-box">
+                                <span style="font-size:12px; font-weight:bold; color:#e74c3c;">INIT:</span>
+                                <input type="number" value="${ent.initiative || 0}" 
+                                    onchange="updateInitiative('${ent.id}', this.value)" ${disabled}>
+                            </div>
+                        `;
+                    }
+                    
+                    let descriptionBlock = (ent.description && ent.description.trim() !== '') ? `<div class="description-box">${ent.description}</div>` : '';
+                    let secretBlock = (canSeeSecret && ent.secret && ent.secret.trim() !== '') ? `<div class="secret-box"><strong>Secret:</strong> ${ent.secret}</div>` : '';
+
+                    card.innerHTML = `
+                        <div class="card-content">
+                            <div class="npc-meta">
+                                ${ent.hometown || ''}
+                                ${ent.isPC ? '<span class="badge badge-pc">PC</span>' : ''}
+                                ${ent.isTravelling ? '<span class="badge badge-travelling">TRAVELLING</span>' : ''}
+                                ${ent.isTempCombatant ? '<span class="badge badge-temp">TEMP</span>' : ''}
+                            </div>
+                            <h3 class="npc-name">${ent.name}</h3>
+                            ${ent.tagline && ent.tagline.trim() !== '' ? `<div class="npc-tagline">"${ent.tagline}"</div>` : ''}
+                            
+                            ${statusHTML}
+                            ${initBoxHTML}
+                            
+                            ${descriptionBlock}
+                            ${secretBlock}
+                            
+                            <div style="margin-top: 10px; display: flex; gap: 5px;">
+                                ${(state.isDM || isOwner) ? `
+                                    ${!ent.isTempCombatant ? `<button onclick="editEntity('${ent.id}')" style="font-size:11px; background:#444; color:white; padding: 5px 10px; flex: 1;">Edit Data</button>` : ''}
+                                    <button onclick="deleteEntity('${ent.id}')" style="font-size:11px; background:#c0392b; color:white; padding: 5px 10px; ${ent.isTempCombatant ? 'flex:1;' : ''}">Delete</button>
+                                ` : ''}
+                            </div>
+                        </div>
+                    `;
+                    container.appendChild(card);
+                });
+            }
+        }
+
+        // --- GAME MECHANICS ---
+        function toggleCombat() {
+            state.combatMode = !state.combatMode;
+            const btn = document.getElementById('combat-toggle-btn');
+            const addBtn = document.getElementById('add-combatant-btn');
+            
+            if (state.combatMode) {
+                btn.classList.add('active');
+                btn.innerText = "🛑 End Combat";
+                addBtn.style.display = "inline-flex";
+            } else {
+                btn.classList.remove('active');
+                btn.innerText = "⚔️ Toggle Combat";
+                addBtn.style.display = "none";
+                
+                state.entities = state.entities.filter(e => !e.isTempCombatant);
+                state.entities.forEach(e => e.initiative = 0);
+                triggerAutoSync();
+            }
+            renderAll();
+        }
+
+        function openCombatantModal() {
+            document.getElementById('c-name').value = '';
+            document.getElementById('c-init').value = '0';
+            document.getElementById('combatant-modal').style.display = 'flex';
+        }
+
+        function saveCombatant() {
+            const name = document.getElementById('c-name').value || "Unknown Enemy";
+            const init = parseInt(document.getElementById('c-init').value) || 0;
+            
+            state.entities.push({
+                id: 'temp_' + Date.now(),
+                name: name,
+                isTempCombatant: true,
+                initiative: init,
+                statuses: [],
+                createdBy: state.currentUser || "DM"
+            });
+            
+            closeModal('combatant-modal');
+            triggerAutoSync(); 
+            renderAll();
+        }
+
+        function updateInitiative(id, val) {
+            const ent = state.entities.find(e => e.id === id);
+            if (ent) {
+                ent.initiative = parseInt(val) || 0;
+                triggerAutoSync();
+                renderAll(); 
+            }
+        }
+
+        function triggerLongRest() {
+            showConfirm("Long Rest", "Trigger a Long Rest? This will clear temporary statuses and progress Revived statuses.", () => {
+                const tempStatuses = ["Blinded", "Charmed", "Deafened", "Frightened", "Grappled", "Incapacitated", "Invisible", "Paralyzed", "Petrified", "Poisoned", "Prone", "Restrained", "Stunned", "Unconscious"];
+                
+                state.entities.forEach(ent => {
+                    if (!ent.statuses) ent.statuses = [];
+                    
+                    ent.statuses = ent.statuses.filter(s => !tempStatuses.includes(s));
+                    
+                    if (ent.statuses.includes("Revived -3")) {
+                        ent.statuses = ent.statuses.filter(s => s !== "Revived -3");
+                        ent.statuses.push("Revived -2");
+                    } else if (ent.statuses.includes("Revived -2")) {
+                        ent.statuses = ent.statuses.filter(s => s !== "Revived -2");
+                        ent.statuses.push("Revived -1");
+                    } else if (ent.statuses.includes("Revived -1")) {
+                        ent.statuses = ent.statuses.filter(s => s !== "Revived -1");
+                    }
+                });
+                
+                triggerAutoSync();
+                renderAll();
+                showToast("Long Rest completed. Statuses updated.", "success");
+            });
+        }
+
+        // --- ADD/EDIT/DELETE LOGIC ---
+        function openAddModal() {
+            document.getElementById('modal-title').innerText = "Add New Character";
+            resetForm();
+            document.getElementById('npc-modal').style.display = 'flex';
+        }
+
+        function editEntity(id) {
+            const ent = state.entities.find(e => e.id === id);
+            document.getElementById('f-isPC').checked = ent.isPC || false;
+            document.getElementById('f-name').value = ent.name;
+            document.getElementById('f-tagline').value = ent.tagline || '';
+            document.getElementById('f-hometown').value = ent.hometown || '';
+            document.getElementById('f-description').value = ent.description || '';
+            document.getElementById('f-secret').value = ent.secret || '';
+            document.getElementById('f-travelling').checked = ent.isTravelling || false;
+            
+            document.querySelectorAll('.status-cb').forEach(cb => {
+                cb.checked = ent.statuses && ent.statuses.includes(cb.value);
+            });
+
+            document.getElementById('npc-modal').dataset.editId = id;
+            document.getElementById('modal-title').innerText = "Edit Character";
+            document.getElementById('npc-modal').style.display = 'flex';
+        }
+
+        function deleteEntity(id) {
+            showConfirm("Delete Character", "Are you sure you want to permanently delete this character?", () => {
+                state.entities = state.entities.filter(e => e.id !== id);
+                triggerAutoSync();
+                renderAll();
+                showToast("Character deleted.", "success");
+            });
+        }
+
+        function saveEntity() {
+            const id = document.getElementById('npc-modal').dataset.editId || 'ent_' + Date.now() + Math.floor(Math.random() * 1000);
+            const activeStatuses = Array.from(document.querySelectorAll('.status-cb:checked')).map(cb => cb.value);
+
+            const existingEnt = state.entities.find(e => e.id === id) || {};
+
+            const ent = {
+                ...existingEnt, 
+                id,
+                isPC: document.getElementById('f-isPC').checked,
+                name: document.getElementById('f-name').value,
+                tagline: document.getElementById('f-tagline').value,
+                hometown: document.getElementById('f-hometown').value,
+                description: document.getElementById('f-description').value,
+                secret: document.getElementById('f-secret').value,
+                isTravelling: document.getElementById('f-travelling').checked,
+                statuses: activeStatuses,
+                initiative: existingEnt.initiative || 0,
+                createdBy: existingEnt.createdBy || (state.currentUser || "DM")
+            };
+
+            const idx = state.entities.findIndex(n => n.id === id);
+            if(idx > -1) {
+                state.entities[idx] = ent;
+            } else {
+                state.entities.push(ent);
+            }
+
+            triggerAutoSync();
+            closeModal('npc-modal');
+            renderAll();
+            showToast("Character saved successfully.", "success");
+        }
+
+        // --- EXPORT LOGIC ---
+        function exportStartOfGame() {
+            let log = `START OF GAME SUMMARY\n========================\n\n`;
+            
+            log += `ACTIVE PARTY & COMPANIONS:\n`;
+            state.entities.filter(n => n.isTravelling || n.isPC).forEach(n => {
+                if(n.isTempCombatant) return;
+                const tagStr = n.tagline ? ` [${n.tagline}]` : '';
+                const statusStr = (n.statuses && n.statuses.length > 0) ? ` {Status: ${n.statuses.join(', ')}}` : '';
+                const hometownStr = n.hometown ? `\n  Hometown: ${n.hometown}` : '';
+                const descStr = n.description ? `\n  ${n.description}` : '';
+                log += `- ${n.name}${tagStr}${statusStr}${hometownStr}${descStr}\n\n`;
+            });
+
+            navigator.clipboard.writeText(log).then(() => {
+                showToast("Start of Game summary copied to clipboard!", "success");
+            }).catch(err => {
+                showToast("Could not copy to clipboard. Check browser permissions.", "error");
+            });
+        }
+
+        // --- UTILS ---
+        function closeModal(id) { document.getElementById(id).style.display = 'none'; }
+        
+        function resetForm() {
+            document.getElementById('f-isPC').checked = false;
+            document.getElementById('f-name').value = '';
+            document.getElementById('f-tagline').value = '';
+            document.getElementById('f-hometown').value = '';
+            document.getElementById('f-description').value = '';
+            document.getElementById('f-secret').value = '';
+            document.getElementById('f-travelling').checked = false;
+            document.querySelectorAll('.status-cb').forEach(cb => cb.checked = false);
+            delete document.getElementById('npc-modal').dataset.editId;
+        }
+
+        // Run
+        init();
+    </script>
+</body>
+</html>
