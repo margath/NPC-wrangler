@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Privacy Policy - NPC Tracker</title>
+    <style>
+        body { 
+            font-family: system-ui, -apple-system, sans-serif; 
+            margin: 0; 
+            background-color: #1e1e24; 
+            color: #e0e0e0; 
+            line-height: 1.6;
+        }
+        header { 
+            background: #2b2b36; 
+            padding: 20px 30px; 
+            border-bottom: 1px solid #444; 
+            text-align: center;
+        }
+        h1 { margin: 0; color: #fff; }
+        .container { 
+            max-width: 800px; 
+            margin: 40px auto; 
+            padding: 0 20px; 
+        }
+        .policy-section { 
+            background: #2a2a35; 
+            padding: 25px; 
+            border-radius: 8px; 
+            border: 1px solid #444; 
+            margin-bottom: 20px; 
+        }
+        h2 { color: #3498db; margin-top: 0; }
+        h3 { color: #f1c40f; }
+        .warning-box {
+            background: #4a1919;
+            border: 1px solid #e74c3c;
+            border-left: 5px solid #e74c3c;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 20px 0;
+        }
+        .warning-box h3 { color: #e74c3c; margin-top: 0; }
+        a { color: #3498db; text-decoration: none; }
+        a:hover { text-decoration: underline; }
+        .back-btn {
+            display: inline-block;
+            background: #555;
+            color: white;
+            padding: 8px 15px;
+            border-radius: 4px;
+            text-decoration: none;
+            font-weight: bold;
+            margin-bottom: 20px;
+            transition: background 0.2s;
+        }
+        .back-btn:hover { background: #666; text-decoration: none; }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>Privacy Policy</h1>
+        <div style="font-size: 12px; color: #aaa; margin-top: 5px;">Last Updated: March 2026</div>
+    </header>
+
+    <div class="container">
+        <a href="javascript:window.close();" class="back-btn">← Close Window</a>
+
+        <div class="policy-section">
+            <h2>1. Overview</h2>
+            <p>This Privacy Policy applies to the NPC & PC Tracker application. Because this tool is designed as a standalone, client-side application for Tabletop RPGs, <strong>we do not centrally collect, host, or sell your personal data.</strong></p>
+            <p>All campaign data is managed and hosted directly by your Game Master (GM) using their own Google Apps Script and Google Sheets account.</p>
+        </div>
+
+        <div class="policy-section">
+            <h2>2. What Data is Collected & How it is Stored</h2>
+            <p>When using this tool, the following data may be processed:</p>
+            <ul>
+                <li><strong>Campaign Data:</strong> NPC names, descriptions, secrets, and PC details.</li>
+                <li><strong>Player Information:</strong> Player names and Character names.</li>
+                <li><strong>Authentication:</strong> A numerical or text-based "PIN" used to identify you in your GM's specific campaign.</li>
+            </ul>
+            
+            <h3>Local Storage (Your Browser)</h3>
+            <p>To allow the app to function offline and load quickly, campaign data is temporarily saved to your browser's local storage (<code>localStorage</code> and <code>sessionStorage</code>). This data remains on your device until you clear your browser data or disconnect from the database.</p>
+
+            <h3>Cloud Storage (Your GM's Google Sheet)</h3>
+            <p>If your GM has enabled Cloud Sync, clicking "Save to Cloud" or "Pull Data" transmits campaign data directly between your browser and your GM's personal Google Sheet. <strong>This application's developers have no access to this Google Sheet.</strong></p>
+        </div>
+
+        <div class="warning-box">
+            <h3>⚠️ Important Security Notice Regarding PINs</h3>
+            <p>The "PIN" system used to log into this application is designed for casual tabletop game management, not strict cryptographic security. Your PIN is stored in plain text inside your GM's Google Sheet.</p>
+            <p><strong>DO NOT use real-world passwords, banking PINs, or sensitive passcodes.</strong> Please use a simple, unique passcode (e.g., "1234" or "Goblin") solely for the purpose of this game.</p>
+        </div>
+
+        <div class="policy-section">
+            <h2>3. Third-Party Services</h2>
+            <p>This application relies on the following third-party services to function:</p>
+            <ul>
+                <li><strong>Google Sheets & Apps Script:</strong> Used by your GM as the database backend. Google's privacy policy applies to data stored on their servers.</li>
+                <li><strong>QR Code API:</strong> We use <code>api.qrserver.com</code> to generate the shareable QR codes. No campaign data is sent to this service—only the Web App URL provided by your GM.</li>
+            </ul>
+        </div>
+
+        <div class="policy-section">
+            <h2>4. Cookies & Tracking</h2>
+            <p>We do not use tracking cookies, analytics trackers, or advertising frameworks. The only browser storage used is strictly necessary for the core functionality of the application (saving your session URL and local database state).</p>
+        </div>
+
+        <div class="policy-section">
+            <h2>5. Contact</h2>
+            <p>If you have any questions about how this application works, please reach out to your Game Master, as they act as the data controller for your specific campaign.</p>
+        </div>
+    </div>
+
+</body>
+</html>
