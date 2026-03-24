@@ -46,10 +46,11 @@
         .status-container { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 10px; }
         .status-pill { background: #e74c3c; color: white; padding: 3px 8px; border-radius: 12px; font-size: 11px; font-weight: bold; white-space: nowrap; }
         .status-pill.revived { background: #e67e22; }
+        .status-pill.exhausted { background: #8e44ad; }
         
         /* Forms & Inputs */
         input, select, textarea { width: 100%; padding: 8px; margin: 5px 0; border-radius: 4px; border: 1px solid #444; background: #1a1a20; color: white; box-sizing: border-box; font-family: inherit; }
-        .checkbox-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; background: #1a1a20; padding: 10px; border-radius: 4px; border: 1px solid #444; max-height: 150px; overflow-y: auto; }
+        .checkbox-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; background: #1a1a20; padding: 10px; border-radius: 4px; border: 1px solid #444; max-height: 200px; overflow-y: auto; }
         .checkbox-grid label { font-size: 12px; display: flex; align-items: center; gap: 5px; cursor: pointer; }
         .checkbox-grid input[type="checkbox"] { width: auto; margin: 0; }
 
@@ -379,8 +380,9 @@ function doPost(e) {
         const STATUSES = [
             "Blinded", "Charmed", "Deafened", "Frightened", "Grappled", 
             "Incapacitated", "Invisible", "Paralyzed", "Petrified", "Poisoned", 
-            "Prone", "Restrained", "Stunned", "Unconscious", "Exhaustion", 
-            "Dead", "Revived -3", "Revived -2", "Revived -1"
+            "Prone", "Restrained", "Stunned", "Unconscious", "Dead", 
+            "Exhausted -6", "Exhausted -5", "Exhausted -4", "Exhausted -3", "Exhausted -2", "Exhausted -1",
+            "Revived -4", "Revived -3", "Revived -2", "Revived -1"
         ];
 
         // --- STATE MANAGEMENT ---
@@ -949,7 +951,9 @@ function doPost(e) {
                     if (ent.isTempCombatant) tags.push('<span class="badge badge-temp">TEMP</span>');
 
                     let statusHTML = (ent.statuses || []).map(s => {
-                        let pClass = s.includes("Revived") ? 'status-pill revived' : 'status-pill';
+                        let pClass = 'status-pill';
+                        if (s.includes("Revived")) pClass += ' revived';
+                        if (s.includes("Exhausted")) pClass += ' exhausted';
                         return `<span class="${pClass}">${s}</span>`;
                     }).join(' ');
 
@@ -1017,7 +1021,9 @@ function doPost(e) {
                     if (ent.statuses && ent.statuses.length > 0) {
                         statusHTML = `<div class="status-container">` + 
                             ent.statuses.map(s => {
-                                let pClass = s.includes("Revived") ? 'status-pill revived' : 'status-pill';
+                                let pClass = 'status-pill';
+                                if (s.includes("Revived")) pClass += ' revived';
+                                if (s.includes("Exhausted")) pClass += ' exhausted';
                                 return `<span class="${pClass}">${s}</span>`;
                             }).join('') + `</div>`;
                     }
@@ -1123,15 +1129,40 @@ function doPost(e) {
         }
 
         function triggerLongRest() {
-            showConfirm("Long Rest", "Trigger a Long Rest? This will clear temporary statuses and progress Revived statuses.", () => {
+            showConfirm("Long Rest", "Trigger a Long Rest? This will clear temporary statuses and alleviate Exhausted and Revived statuses by 1.", () => {
                 const tempStatuses = ["Blinded", "Charmed", "Deafened", "Frightened", "Grappled", "Incapacitated", "Invisible", "Paralyzed", "Petrified", "Poisoned", "Prone", "Restrained", "Stunned", "Unconscious"];
                 
                 state.entities.forEach(ent => {
                     if (!ent.statuses) ent.statuses = [];
                     
+                    // 1. Clear temps
                     ent.statuses = ent.statuses.filter(s => !tempStatuses.includes(s));
                     
-                    if (ent.statuses.includes("Revived -3")) {
+                    // 2. Progress Exhausted
+                    if (ent.statuses.includes("Exhausted -6")) {
+                        ent.statuses = ent.statuses.filter(s => s !== "Exhausted -6");
+                        ent.statuses.push("Exhausted -5");
+                    } else if (ent.statuses.includes("Exhausted -5")) {
+                        ent.statuses = ent.statuses.filter(s => s !== "Exhausted -5");
+                        ent.statuses.push("Exhausted -4");
+                    } else if (ent.statuses.includes("Exhausted -4")) {
+                        ent.statuses = ent.statuses.filter(s => s !== "Exhausted -4");
+                        ent.statuses.push("Exhausted -3");
+                    } else if (ent.statuses.includes("Exhausted -3")) {
+                        ent.statuses = ent.statuses.filter(s => s !== "Exhausted -3");
+                        ent.statuses.push("Exhausted -2");
+                    } else if (ent.statuses.includes("Exhausted -2")) {
+                        ent.statuses = ent.statuses.filter(s => s !== "Exhausted -2");
+                        ent.statuses.push("Exhausted -1");
+                    } else if (ent.statuses.includes("Exhausted -1")) {
+                        ent.statuses = ent.statuses.filter(s => s !== "Exhausted -1");
+                    }
+                    
+                    // 3. Progress Revived
+                    if (ent.statuses.includes("Revived -4")) {
+                        ent.statuses = ent.statuses.filter(s => s !== "Revived -4");
+                        ent.statuses.push("Revived -3");
+                    } else if (ent.statuses.includes("Revived -3")) {
                         ent.statuses = ent.statuses.filter(s => s !== "Revived -3");
                         ent.statuses.push("Revived -2");
                     } else if (ent.statuses.includes("Revived -2")) {
