@@ -36,9 +36,7 @@
             letter-spacing: 1px;
             transition: background 0.2s;
         }
-        .privacy-ribbon:hover {
-            background: #c0392b;
-        }
+        .privacy-ribbon:hover { background: #c0392b; }
         
         /* Card Styles */
         .npc-card { background: #2a2a35; border-radius: 10px; border: 1px solid #444; position: relative; display: flex; flex-direction: column; overflow: hidden; transition: transform 0.2s; }
@@ -114,6 +112,19 @@
         .header-left { display: flex; align-items: center; gap: 15px; }
         .qr-container { background: white; padding: 4px; border-radius: 4px; cursor: pointer; transition: transform 0.2s; display: flex; justify-content: center; align-items: center; min-width: 45px; min-height: 45px;}
         .qr-container:hover { transform: scale(1.05); }
+
+        /* Print Stylesheet for clean paper logs */
+        @media print {
+            body { background: white; color: black; }
+            header, .privacy-ribbon, .no-print, .controls, .add-btn, .action-cell { display: none !important; }
+            .grid-view, .table-container { padding: 0; }
+            .table-view { background: white; color: black; border: 1px solid #ccc; font-size: 12px; }
+            .table-view th { background: #eee; color: black; border: 1px solid #ccc; }
+            .table-view td, .table-view th { border: 1px solid #ccc; padding: 8px; }
+            .status-pill { border: 1px solid #000; color: #000; background: transparent; padding: 1px 4px; font-weight: normal; }
+            .secret-box { border: 1px dashed #000; background: transparent; color: #000; }
+            .npc-tagline { color: #555; }
+        }
     </style>
 </head>
 <body>
@@ -764,7 +775,7 @@ function doPost(e) {
                                 ${state.combatMode ? '<th style="text-align:center;">Init</th>' : ''}
                                 <th>Statuses</th>
                                 <th style="width: 30%;">Details</th>
-                                <th style="min-width: 120px;">Actions</th>
+                                <th style="min-width: 120px;" class="action-cell">Actions</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -790,16 +801,20 @@ function doPost(e) {
                         initHTML = `<td style="text-align:center;"><input type="number" style="width:50px; text-align:center; padding:4px;" value="${ent.initiative || 0}" onchange="updateInitiative('${ent.id}', this.value)" ${disabled}></td>`;
                     }
 
-                    let detailsStr = `<div style="font-size:12px; margin-bottom:5px;"><strong>Desc:</strong> ${ent.description || 'N/A'}</div>`;
-                    if (canSeeSecret && ent.secret) {
-                        detailsStr += `<div style="font-size:12px; color:#d192e8;"><strong>Secret:</strong> ${ent.secret}</div>`;
+                    // Dynamically render details only if they exist
+                    let detailsStr = '';
+                    if (ent.description && ent.description.trim() !== '') {
+                        detailsStr += `<div style="font-size:12px; margin-bottom:5px;"><strong>Desc:</strong> ${ent.description}</div>`;
+                    }
+                    if (canSeeSecret && ent.secret && ent.secret.trim() !== '') {
+                        detailsStr += `<div style="font-size:12px; color:#d192e8;" class="secret-box"><strong>Secret:</strong> ${ent.secret}</div>`;
                     }
 
                     let actionHTML = '';
                     if (state.isDM || isOwner) {
                         actionHTML = `
-                            <button onclick="editEntity('${ent.id}')" style="font-size:11px; background:#444; color:white; padding: 4px 8px; margin-right: 4px;">Edit</button>
-                            <button onclick="deleteEntity('${ent.id}')" style="font-size:11px; background:#c0392b; color:white; padding: 4px 8px;">Del</button>
+                            <button onclick="editEntity('${ent.id}')" style="font-size:11px; background:#444; color:white; padding: 4px 8px; margin-right: 4px;" class="no-print">Edit</button>
+                            <button onclick="deleteEntity('${ent.id}')" style="font-size:11px; background:#c0392b; color:white; padding: 4px 8px;" class="no-print">Del</button>
                         `;
                     }
 
@@ -807,14 +822,14 @@ function doPost(e) {
                         <tr class="${isDead ? 'dead' : ''}">
                             <td>
                                 <strong>${ent.name}</strong>
-                                ${ent.tagline ? `<br><span style="font-size:11px; color:#aaa; font-style:italic;">"${ent.tagline}"</span>` : ''}
+                                ${ent.tagline ? `<br><span style="font-size:11px; color:#aaa; font-style:italic;" class="npc-tagline">"${ent.tagline}"</span>` : ''}
                             </td>
-                            <td>${ent.hometown || '-'}</td>
+                            <td>${ent.hometown || ''}</td>
                             <td>${tags.join('<br>')}</td>
                             ${initHTML}
                             <td><div class="status-container" style="margin:0;">${statusHTML}</div></td>
                             <td>${detailsStr}</td>
-                            <td>${actionHTML}</td>
+                            <td class="action-cell">${actionHTML}</td>
                         </tr>
                     `;
                 });
@@ -822,6 +837,7 @@ function doPost(e) {
                 container.innerHTML = tableHTML;
 
             } else {
+                // GRID VIEW
                 displayList.forEach(ent => {
                     const isOwner = (state.currentUser === ent.createdBy) || (state.currentCharacter && ent.name === state.currentCharacter);
                     const canSeeSecret = state.isDM || isOwner;
@@ -836,6 +852,11 @@ function doPost(e) {
                     const card = document.createElement('div');
                     card.className = classes.join(' ');
                     
+                    let metaTags = [];
+                    if (ent.hometown && ent.hometown.trim() !== '') metaTags.push(ent.hometown);
+                    if (ent.isPC) metaTags.push('<span class="badge badge-pc">PC</span>');
+                    if (ent.isTravelling) metaTags.push('<span class="badge badge-travelling">PARTY</span>');
+
                     let statusHTML = '';
                     if (ent.statuses && ent.statuses.length > 0) {
                         statusHTML = `<div class="status-container">` + 
@@ -859,21 +880,17 @@ function doPost(e) {
                     
                     card.innerHTML = `
                         <div class="card-content">
-                            <div class="npc-meta">
-                                ${ent.hometown || 'Unknown Origin'}
-                                ${ent.isPC ? '<span class="badge badge-pc">PC</span>' : ''}
-                                ${ent.isTravelling ? '<span class="badge badge-travelling">TRAVELLING</span>' : ''}
-                            </div>
+                            ${metaTags.length > 0 ? `<div class="npc-meta">${metaTags.join(' ')}</div>` : ''}
                             <h3 class="npc-name">${ent.name}</h3>
                             ${ent.tagline ? `<div class="npc-tagline">"${ent.tagline}"</div>` : ''}
                             
                             ${statusHTML}
                             ${initBoxHTML}
                             
-                            <div class="description-box">${ent.description}</div>
-                            ${canSeeSecret ? `<div class="secret-box"><strong>Secret:</strong> ${ent.secret || 'None'}</div>` : ''}
+                            ${ent.description && ent.description.trim() !== '' ? `<div class="description-box">${ent.description}</div>` : ''}
+                            ${canSeeSecret && ent.secret && ent.secret.trim() !== '' ? `<div class="secret-box"><strong>Secret:</strong> ${ent.secret}</div>` : ''}
                             
-                            <div style="margin-top: 10px; display: flex; gap: 5px;">
+                            <div style="margin-top: 10px; display: flex; gap: 5px;" class="no-print">
                                 ${(state.isDM || isOwner) ? `
                                     <button onclick="editEntity('${ent.id}')" style="font-size:11px; background:#444; color:white; padding: 5px 10px; flex: 1;">Edit Data</button>
                                     <button onclick="deleteEntity('${ent.id}')" style="font-size:11px; background:#c0392b; color:white; padding: 5px 10px;">Delete</button>
@@ -950,7 +967,7 @@ function doPost(e) {
             document.getElementById('f-name').value = ent.name;
             document.getElementById('f-tagline').value = ent.tagline || '';
             document.getElementById('f-hometown').value = ent.hometown;
-            document.getElementById('f-description').value = ent.description;
+            document.getElementById('f-description').value = ent.description || '';
             document.getElementById('f-secret').value = ent.secret || '';
             document.getElementById('f-travelling').checked = ent.isTravelling;
             
@@ -981,11 +998,11 @@ function doPost(e) {
                 ...existingEnt, 
                 id,
                 isPC: document.getElementById('f-isPC').checked,
-                name: document.getElementById('f-name').value,
-                tagline: document.getElementById('f-tagline').value,
-                hometown: document.getElementById('f-hometown').value,
-                description: document.getElementById('f-description').value,
-                secret: document.getElementById('f-secret').value,
+                name: document.getElementById('f-name').value.trim(),
+                tagline: document.getElementById('f-tagline').value.trim(),
+                hometown: document.getElementById('f-hometown').value.trim(),
+                description: document.getElementById('f-description').value.trim(),
+                secret: document.getElementById('f-secret').value.trim(),
                 isTravelling: document.getElementById('f-travelling').checked,
                 statuses: activeStatuses,
                 initiative: existingEnt.initiative || 0,
