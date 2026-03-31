@@ -43,6 +43,7 @@
         .npc-card.pc { border: 2px solid #f1c40f; box-shadow: 0 0 10px rgba(241, 196, 15, 0.2); }
         .npc-card.travelling { border: 2px solid #2ecc71; box-shadow: 0 0 10px rgba(46, 204, 113, 0.2); }
         .npc-card.hometown-focus { border: 2px solid #3498db; }
+        .npc-card.temp-combatant { border: 2px solid #e67e22; box-shadow: 0 0 10px rgba(230, 126, 34, 0.2); }
         .npc-card.dead { opacity: 0.6; filter: grayscale(0.8); }
         .card-content { padding: 15px; flex-grow: 1; }
         
@@ -64,6 +65,7 @@
         .badge { padding: 2px 6px; border-radius: 4px; font-size: 10px; margin-left: 5px; vertical-align: middle; font-weight: bold; color: #000; }
         .badge-pc { background: #f1c40f; }
         .badge-travelling { background: #2ecc71; }
+        .badge-temp { background: #e67e22; color: #fff; }
         .status-container { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 10px; }
         .status-pill { background: #e74c3c; color: white; padding: 3px 8px; border-radius: 12px; font-size: 11px; font-weight: bold; white-space: nowrap; }
         .status-pill.revived { background: #e67e22; }
@@ -91,15 +93,21 @@
         button.cloud-btn { background: #2c3e50; color: white; border: 1px solid #555; }
         button.cloud-btn.pull { background: #1abc9c; border: none; }
         button.view-btn { background: #45b7d1; color: #111; }
+        button.unhide-btn { background: #f39c12; color: #111; display: none; }
+        button.temp-btn { background: #e67e22; color: white; display: none; }
         
         /* Login States */
         button.login-btn { background: #f39c12; color: #111; }
         button.elevate-btn { background: #9b59b6; color: white; display: none; }
         button.logout-btn { background: #e74c3c; color: white; display: none; }
         
-        /* Initiative */
-        .init-box { display: flex; align-items: center; gap: 5px; background: #1a1a20; padding: 5px; border-radius: 4px; border: 1px solid #444; margin-top: 10px; }
-        .init-box input { width: 60px; margin: 0; text-align: center; font-weight: bold; font-size: 16px; }
+        /* Initiative & HP */
+        .combat-stats-box { display: flex; gap: 10px; margin-top: 10px; }
+        .init-box { display: flex; align-items: center; gap: 5px; background: #1a1a20; padding: 5px; border-radius: 4px; border: 1px solid #444; flex: 1; }
+        .init-box input { width: 100%; margin: 0; text-align: center; font-weight: bold; font-size: 14px; }
+        .init-box span { font-size: 11px; font-weight: bold; color: #aaa; width: 35px;}
+        .init-box.hp-box span { color: #2ecc71; }
+        .init-box.init-box-red span { color: #e74c3c; }
         
         /* Modals */
         .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 1000; display: none; justify-content: center; align-items: center; }
@@ -146,6 +154,10 @@
                 </select>
             <button class="view-btn" onclick="toggleView()">🗂️ Toggle View</button>
             <button class="combat-btn" id="combat-toggle-btn" onclick="toggleCombat()">⚔️ Toggle Combat</button>
+            
+            <button class="unhide-btn" id="unhide-btn" onclick="unhideAllCombat()">👁️ Unhide All</button>
+            <button class="temp-btn" id="add-temp-btn" onclick="openTempModal()">+ Temp Combatant</button>
+
             <button class="rest-btn" id="rest-btn" onclick="triggerLongRest()">🏕️ Long Rest</button>
             
             <button class="cloud-btn pull" id="cloud-pull-btn" onclick="pullFromCloud()">☁️ Pull Data</button>
@@ -190,6 +202,20 @@
             <div style="display:flex; gap: 10px; margin-top: 20px;">
                 <button onclick="saveEntity()" class="add-btn" style="flex:1; height: 40px;">Save</button>
                 <button onclick="closeModal('npc-modal')" style="background:#555; color:white; height: 40px;">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="temp-modal" class="modal-overlay">
+        <div class="modal-box" style="max-width: 300px;">
+            <h2>Add Temp Combatant</h2>
+            <p style="font-size: 11px; color: #aaa; margin-top: 0;">These disappear when combat ends.</p>
+            <input type="text" id="t-name" placeholder="Name (e.g., Goblin)">
+            <input type="number" id="t-hp" placeholder="Max HP">
+            <input type="number" id="t-init" placeholder="Initiative (Optional)">
+            <div style="display:flex; gap: 10px; margin-top: 15px;">
+                <button onclick="saveTempCombatant()" class="temp-btn" style="flex:1; display: block;">Add</button>
+                <button onclick="closeModal('temp-modal')" style="flex:1; background:#555; color:white;">Cancel</button>
             </div>
         </div>
     </div>
@@ -427,7 +453,7 @@ function doPost(e) {
                 filter.appendChild(opt);
             });
             
-            filter.value = currentVal; // Restore selection if still valid
+            filter.value = currentVal; 
         }
 
         function updateConnectionUI() {
@@ -615,7 +641,8 @@ function doPost(e) {
                         id: npc.id || 'npc_' + Date.now() + Math.floor(Math.random() * 1000)
                     }));
                     
-                    state.entities = [...cloudPCs, ...cloudNPCs];
+                    // Filter out temps from the cloud overwrite just to be safe
+                    state.entities = [...cloudPCs, ...cloudNPCs].filter(e => !e.isTemp);
                     saveLocalDatabase();
                     renderAll();
                     alert("✅ Data successfully pulled and validated from Google Sheets!");
@@ -649,8 +676,11 @@ function doPost(e) {
         async function syncToCloud() {
             if (!GAS_WEB_APP_URL) return showSetupModalWithError("Please connect a database first.");
 
-            const pcsArray = state.entities.filter(e => e.isPC);
-            const npcsArray = state.entities.filter(e => !e.isPC);
+            // Exclude temporary combatants from the cloud sync
+            const permanentEntities = state.entities.filter(e => !e.isTemp);
+            
+            const pcsArray = permanentEntities.filter(e => e.isPC);
+            const npcsArray = permanentEntities.filter(e => !e.isPC);
 
             const payload = {
                 action: 'saveData',
@@ -786,14 +816,17 @@ function doPost(e) {
             container.className = state.viewMode === 'grid' ? 'grid-view' : 'table-container';
 
             const displayList = [...state.entities].filter(ent => {
-                // Hide from combat if requested and in combat mode
-                if (state.combatMode && ent.hideInCombat) return false;
+                if (state.combatMode) {
+                    if (ent.hideInCombat) return false; 
+                    if (ent.hiddenThisCombat) return false; 
+                } else {
+                    if (ent.isTemp) return false; // Hide temps if combat ends but they linger
+                }
                 return true;
             }).sort((a, b) => {
                 if (state.combatMode) {
                     const initA = a.initiative || 0;
                     const initB = b.initiative || 0;
-                    // Unassigned/0 Init stays at the very top
                     if (initA === 0 && initB !== 0) return -1;
                     if (initA !== 0 && initB === 0) return 1;
                     return initB - initA || a.name.localeCompare(b.name);
@@ -816,10 +849,10 @@ function doPost(e) {
                                 <th style="min-width: 150px;">Name / Identity</th>
                                 <th>Origin</th>
                                 <th>Tags</th>
-                                ${state.combatMode ? '<th style="text-align:center;">Init</th>' : ''}
+                                ${state.combatMode ? '<th style="text-align:center;">Combat Stats</th>' : ''}
                                 <th>Statuses</th>
                                 <th style="width: 30%;">Details</th>
-                                <th style="min-width: 120px;" class="action-cell">Actions</th>
+                                <th style="min-width: 150px;" class="action-cell">Actions</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -833,6 +866,7 @@ function doPost(e) {
                     let tags = [];
                     if (ent.isPC) tags.push('<span class="badge badge-pc">PC</span>');
                     if (ent.isTravelling) tags.push('<span class="badge badge-travelling">PARTY</span>');
+                    if (ent.isTemp) tags.push('<span class="badge badge-temp">TEMP</span>');
 
                     let statusHTML = (ent.statuses || []).map(s => {
                         let pClass = 'status-pill';
@@ -841,13 +875,24 @@ function doPost(e) {
                         return `<span class="${pClass}">${s}</span>`;
                     }).join(' ');
 
-                    let initHTML = '';
+                    let combatStatsHTML = '';
                     if (state.combatMode) {
                         const disabled = state.isDM || isOwner ? '' : 'disabled';
-                        initHTML = `<td style="text-align:center;"><input type="number" style="width:50px; text-align:center; padding:4px;" value="${ent.initiative || 0}" onchange="updateInitiative('${ent.id}', this.value)" ${disabled}></td>`;
+                        combatStatsHTML = `
+                            <td>
+                                <div class="combat-stats-box" style="margin: 0; justify-content: center;">
+                                    <div class="init-box init-box-red" style="width: 70px;">
+                                        <span>INIT</span>
+                                        <input type="number" value="${ent.initiative || 0}" onchange="updateInitiative('${ent.id}', this.value)" ${disabled}>
+                                    </div>
+                                    <div class="init-box hp-box" style="width: 70px;">
+                                        <span>HP</span>
+                                        <input type="number" value="${ent.hp || 0}" onchange="updateHP('${ent.id}', this.value)" ${disabled}>
+                                    </div>
+                                </div>
+                            </td>`;
                     }
 
-                    // Dynamically render details only if they exist
                     let detailsStr = '';
                     if (ent.description && ent.description.trim() !== '') {
                         detailsStr += `<div style="font-size:12px; margin-bottom:5px;"><strong>Desc:</strong> ${ent.description}</div>`;
@@ -857,11 +902,16 @@ function doPost(e) {
                     }
 
                     let actionHTML = '';
+                    if (state.combatMode && (state.isDM || isOwner)) {
+                        actionHTML += `<button onclick="hideFromCombat('${ent.id}')" style="font-size:11px; background:#8e44ad; color:white; padding: 4px 8px; margin-right: 4px;" title="Hide from this combat">👻 Hide</button>`;
+                        if (ent.isTemp) {
+                            actionHTML += `<button onclick="cloneEntity('${ent.id}')" style="font-size:11px; background:#f39c12; color:#111; padding: 4px 8px; margin-right: 4px;">👯 Clone</button>`;
+                        }
+                    }
+                    
                     if (state.isDM || isOwner) {
-                        actionHTML = `
-                            <button onclick="editEntity('${ent.id}')" style="font-size:11px; background:#444; color:white; padding: 4px 8px; margin-right: 4px;" class="no-print">Edit</button>
-                            <button onclick="deleteEntity('${ent.id}')" style="font-size:11px; background:#c0392b; color:white; padding: 4px 8px;" class="no-print">Del</button>
-                        `;
+                        if (!ent.isTemp) actionHTML += `<button onclick="editEntity('${ent.id}')" style="font-size:11px; background:#444; color:white; padding: 4px 8px; margin-right: 4px;" class="no-print">Edit</button>`;
+                        actionHTML += `<button onclick="deleteEntity('${ent.id}')" style="font-size:11px; background:#c0392b; color:white; padding: 4px 8px;" class="no-print">Del</button>`;
                     }
 
                     tableHTML += `
@@ -872,7 +922,7 @@ function doPost(e) {
                             </td>
                             <td>${ent.hometown || ''}</td>
                             <td>${tags.join('<br>')}</td>
-                            ${initHTML}
+                            ${combatStatsHTML}
                             <td><div class="status-container" style="margin:0;">${statusHTML}</div></td>
                             <td>${detailsStr}</td>
                             <td class="action-cell">${actionHTML}</td>
@@ -892,6 +942,7 @@ function doPost(e) {
                     let classes = ['npc-card'];
                     if (ent.isPC) classes.push('pc');
                     if (ent.isTravelling) classes.push('travelling');
+                    if (ent.isTemp) classes.push('temp-combatant');
                     if (ent.hometown === selectedHometown && !state.combatMode) classes.push('hometown-focus');
                     if (isDead) classes.push('dead');
 
@@ -902,6 +953,7 @@ function doPost(e) {
                     if (ent.hometown && ent.hometown.trim() !== '') metaTags.push(ent.hometown);
                     if (ent.isPC) metaTags.push('<span class="badge badge-pc">PC</span>');
                     if (ent.isTravelling) metaTags.push('<span class="badge badge-travelling">PARTY</span>');
+                    if (ent.isTemp) metaTags.push('<span class="badge badge-temp">TEMP</span>');
 
                     let statusHTML = '';
                     if (ent.statuses && ent.statuses.length > 0) {
@@ -914,16 +966,34 @@ function doPost(e) {
                             }).join('') + `</div>`;
                     }
 
-                    let initBoxHTML = '';
+                    let combatStatsBoxHTML = '';
                     if (state.combatMode) {
                         const disabled = state.isDM || isOwner ? '' : 'disabled';
-                        initBoxHTML = `
-                            <div class="init-box">
-                                <span style="font-size:12px; font-weight:bold; color:#e74c3c;">INIT:</span>
-                                <input type="number" value="${ent.initiative || 0}" 
-                                    onchange="updateInitiative('${ent.id}', this.value)" ${disabled}>
+                        combatStatsBoxHTML = `
+                            <div class="combat-stats-box">
+                                <div class="init-box init-box-red">
+                                    <span>INIT</span>
+                                    <input type="number" value="${ent.initiative || 0}" onchange="updateInitiative('${ent.id}', this.value)" ${disabled}>
+                                </div>
+                                <div class="init-box hp-box">
+                                    <span>HP</span>
+                                    <input type="number" value="${ent.hp || 0}" onchange="updateHP('${ent.id}', this.value)" ${disabled}>
+                                </div>
                             </div>
                         `;
+                    }
+                    
+                    let actionHTML = '';
+                    if (state.combatMode && (state.isDM || isOwner)) {
+                        actionHTML += `<button onclick="hideFromCombat('${ent.id}')" style="font-size:11px; background:#8e44ad; color:white; padding: 5px 10px; flex: 1;" title="Hide from this combat">👻 Hide</button>`;
+                        if (ent.isTemp) {
+                            actionHTML += `<button onclick="cloneEntity('${ent.id}')" style="font-size:11px; background:#f39c12; color:#111; padding: 5px 10px; flex: 1;">👯 Clone</button>`;
+                        }
+                    }
+                    
+                    if (state.isDM || isOwner) {
+                        if (!ent.isTemp) actionHTML += `<button onclick="editEntity('${ent.id}')" style="font-size:11px; background:#444; color:white; padding: 5px 10px; flex: 1;" class="no-print">Edit Data</button>`;
+                        actionHTML += `<button onclick="deleteEntity('${ent.id}')" style="font-size:11px; background:#c0392b; color:white; padding: 5px 10px;" class="no-print">Delete</button>`;
                     }
                     
                     card.innerHTML = `
@@ -933,16 +1003,13 @@ function doPost(e) {
                             ${ent.tagline ? `<div class="npc-tagline">"${ent.tagline}"</div>` : ''}
                             
                             ${statusHTML}
-                            ${initBoxHTML}
+                            ${combatStatsBoxHTML}
                             
                             ${ent.description && ent.description.trim() !== '' ? `<div class="description-box">${ent.description}</div>` : ''}
                             ${canSeeSecret && ent.secret && ent.secret.trim() !== '' ? `<div class="secret-box"><strong>Secret:</strong> ${ent.secret}</div>` : ''}
                             
                             <div style="margin-top: 10px; display: flex; gap: 5px;" class="no-print">
-                                ${(state.isDM || isOwner) ? `
-                                    <button onclick="editEntity('${ent.id}')" style="font-size:11px; background:#444; color:white; padding: 5px 10px; flex: 1;">Edit Data</button>
-                                    <button onclick="deleteEntity('${ent.id}')" style="font-size:11px; background:#c0392b; color:white; padding: 5px 10px;">Delete</button>
-                                ` : ''}
+                                ${actionHTML}
                             </div>
                         </div>
                     `;
@@ -955,13 +1022,26 @@ function doPost(e) {
         function toggleCombat() {
             state.combatMode = !state.combatMode;
             const btn = document.getElementById('combat-toggle-btn');
+            const unhideBtn = document.getElementById('unhide-btn');
+            const tempBtn = document.getElementById('add-temp-btn');
+            
             if (state.combatMode) {
                 btn.classList.add('active');
                 btn.innerText = "🛑 End Combat";
+                unhideBtn.style.display = 'inline-flex';
+                if (state.isDM || state.currentUser) tempBtn.style.display = 'inline-flex';
             } else {
                 btn.classList.remove('active');
                 btn.innerText = "⚔️ Toggle Combat";
-                state.entities.forEach(e => e.initiative = 0);
+                unhideBtn.style.display = 'none';
+                tempBtn.style.display = 'none';
+                
+                // Cleanup Combat State
+                state.entities = state.entities.filter(e => !e.isTemp);
+                state.entities.forEach(e => {
+                    e.initiative = 0;
+                    e.hiddenThisCombat = false;
+                });
                 saveLocalDatabase();
             }
             renderAll();
@@ -975,6 +1055,14 @@ function doPost(e) {
                 renderAll(); 
             }
         }
+        
+        function updateHP(id, val) {
+            const ent = state.entities.find(e => e.id === id);
+            if (ent) {
+                ent.hp = parseInt(val) || 0;
+                saveLocalDatabase();
+            }
+        }
 
         function triggerLongRest() {
             if (!state.currentUser && !state.isDM) return alert("You must be logged in to perform this action.");
@@ -985,16 +1073,13 @@ function doPost(e) {
                 
                 let newStatuses = [];
                 
-                // Preserve Deceased status entirely
                 if (ent.statuses.includes("Deceased")) newStatuses.push("Deceased");
                 
-                // Progress Revived
                 if (ent.statuses.includes("Revived -4")) newStatuses.push("Revived -3");
                 else if (ent.statuses.includes("Revived -3")) newStatuses.push("Revived -2");
                 else if (ent.statuses.includes("Revived -2")) newStatuses.push("Revived -1");
                 else if (ent.statuses.includes("Revived -1")) { /* Cleared */ }
                 
-                // Progress Exhaustion
                 if (ent.statuses.includes("Exhausted -6")) newStatuses.push("Exhausted -5");
                 else if (ent.statuses.includes("Exhausted -5")) newStatuses.push("Exhausted -4");
                 else if (ent.statuses.includes("Exhausted -4")) newStatuses.push("Exhausted -3");
@@ -1010,6 +1095,66 @@ function doPost(e) {
             alert("Long Rest completed. Temporary statuses cleared, penalties updated.");
         }
 
+        // --- COMBAT VISIBILITY & CLONING ---
+        function hideFromCombat(id) {
+            const ent = state.entities.find(e => e.id === id);
+            if (ent) {
+                ent.hiddenThisCombat = true;
+                saveLocalDatabase();
+                renderAll();
+            }
+        }
+
+        function unhideAllCombat() {
+            state.entities.forEach(e => e.hiddenThisCombat = false);
+            saveLocalDatabase();
+            renderAll();
+        }
+
+        function openTempModal() {
+            document.getElementById('t-name').value = '';
+            document.getElementById('t-hp').value = '';
+            document.getElementById('t-init').value = '';
+            document.getElementById('temp-modal').style.display = 'flex';
+        }
+
+        function saveTempCombatant() {
+            const name = document.getElementById('t-name').value.trim();
+            if (!name) return alert("Temp combatant needs a name.");
+            
+            const ent = {
+                id: 'temp_' + Date.now() + Math.floor(Math.random() * 1000),
+                isTemp: true,
+                name: name,
+                hp: parseInt(document.getElementById('t-hp').value) || 0,
+                initiative: parseInt(document.getElementById('t-init').value) || 0,
+                createdBy: state.currentUser || "DM",
+                statuses: []
+            };
+
+            state.entities.push(ent);
+            saveLocalDatabase();
+            closeModal('temp-modal');
+            renderAll();
+        }
+
+        function cloneEntity(id) {
+            const ent = state.entities.find(e => e.id === id);
+            if (!ent) return;
+            
+            const clone = JSON.parse(JSON.stringify(ent)); 
+            clone.id = 'temp_' + Date.now() + Math.floor(Math.random() * 1000);
+            
+            // Generate numbered name (e.g. "Goblin (2)")
+            let baseName = clone.name.replace(/\s\(\d+\)$/, '');
+            const existingClones = state.entities.filter(e => e.name.startsWith(baseName));
+            clone.name = `${baseName} (${existingClones.length + 1})`;
+            
+            state.entities.push(clone);
+            saveLocalDatabase();
+            renderAll();
+        }
+
         // --- ADD/EDIT/DELETE LOGIC ---
         function openAddModal() {
             if (!state.currentUser && !state.isDM) return alert("You must be logged in to add a character.");
@@ -1023,10 +1168,10 @@ function doPost(e) {
             document.getElementById('f-isPC').checked = ent.isPC || false;
             document.getElementById('f-name').value = ent.name;
             document.getElementById('f-tagline').value = ent.tagline || '';
-            document.getElementById('f-hometown').value = ent.hometown;
+            document.getElementById('f-hometown').value = ent.hometown || '';
             document.getElementById('f-description').value = ent.description || '';
             document.getElementById('f-secret').value = ent.secret || '';
-            document.getElementById('f-travelling').checked = ent.isTravelling;
+            document.getElementById('f-travelling').checked = ent.isTravelling || false;
             document.getElementById('f-hide-combat').checked = ent.hideInCombat || false;
             
             document.querySelectorAll('.status-cb').forEach(cb => {
@@ -1052,7 +1197,6 @@ function doPost(e) {
 
             const existingEnt = state.entities.find(e => e.id === id) || {};
 
-            // Check for revival logic: If Deceased was removed from existing, automatically push Revived -4
             if (existingEnt.statuses && existingEnt.statuses.includes("Deceased") && !activeStatuses.includes("Deceased")) {
                 if (!activeStatuses.includes("Revived -4")) {
                     activeStatuses.push("Revived -4");
@@ -1099,7 +1243,7 @@ function doPost(e) {
             });
 
             log += `OTHER NOTABLE NPCS:\n`;
-            state.entities.filter(n => !n.isTravelling && !n.isPC).forEach(n => {
+            state.entities.filter(n => !n.isTravelling && !n.isPC && !n.isTemp).forEach(n => {
                 const tagStr = n.tagline ? ` [${n.tagline}]` : '';
                 log += `- ${n.name}${tagStr}: ${n.description}\n`;
             });
