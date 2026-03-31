@@ -86,7 +86,11 @@
         button.add-btn { background: #2ecc71; color: #111; }
         button.dm-btn { background: #9b59b6; color: white; }
         button.setup-btn { background: #8e44ad; color: white; }
-        button.disconnect-btn { background: #555; color: white; width: 100%; margin-top: 10px; display: none; height: 40px; }
+        
+        /* Modal Specific Buttons */
+        .disconnect-btn { background: #555; color: white; width: 100%; margin-top: 10px; display: none; height: 40px; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; transition: background 0.2s; font-size: 14px; }
+        .copy-btn { background: #3498db; color: white; border: none; padding: 0 15px; border-radius: 4px; cursor: pointer; font-weight: bold; height: 38px; font-size: 14px; }
+        
         button.combat-btn { background: #e74c3c; color: white; }
         button.combat-btn.active { background: #c0392b; border: 2px solid #fff; }
         button.rest-btn { background: #3498db; color: white; }
@@ -215,7 +219,7 @@
             <input type="number" id="t-init" placeholder="Initiative (Optional)">
             <div style="display:flex; gap: 10px; margin-top: 15px;">
                 <button onclick="saveTempCombatant()" class="temp-btn" style="flex:1; display: block;">Add</button>
-                <button onclick="closeModal('temp-modal')" style="flex:1; background:#555; color:white;">Cancel</button>
+                <button onclick="closeModal('temp-modal')" style="flex:1; background:#555; color:white; border:none; border-radius:4px; font-weight:bold; cursor:pointer;">Cancel</button>
             </div>
         </div>
     </div>
@@ -230,7 +234,7 @@
             <div style="display:flex; gap: 10px; margin-top: 15px;">
                 <button onclick="attemptLogin()" class="login-btn" style="flex:1;">Login</button>
             </div>
-            <button onclick="closeModal('login-modal')" style="width: 100%; margin-top: 10px; background:#555; color:white; padding: 8px;">Cancel</button>
+            <button onclick="closeModal('login-modal')" style="width: 100%; margin-top: 10px; background:#555; color:white; padding: 8px; border:none; border-radius:4px; font-weight:bold; cursor:pointer;">Cancel</button>
         </div>
     </div>
 
@@ -246,8 +250,13 @@
             <div style="display: flex; gap: 20px; align-items: flex-start;">
                 <div style="flex: 1;">
                     <p style="font-size: 14px; margin-top: 0;">Provide your Google Apps Script Web App URL to sync data for this session. This URL is temporarily saved in your browser and wiped when closed.</p>
-                    <input type="text" id="setup-gas-url" placeholder="https://script.google.com/macros/s/.../exec">
-                    <button onclick="applyGasUrl()" class="add-btn" style="width: 100%; margin-top: 10px; height: 40px;">Connect & Load Database</button>
+                    
+                    <div style="display: flex; gap: 5px; margin-top: 5px;">
+                        <input type="text" id="setup-gas-url" placeholder="https://script.google.com/macros/s/.../exec" style="margin: 0; flex: 1;">
+                        <button onclick="copyGasUrl()" class="copy-btn" title="Copy URL">📋 Copy</button>
+                    </div>
+                    
+                    <button onclick="applyGasUrl()" class="add-btn" style="width: 100%; margin-top: 10px; height: 40px; border:none; border-radius:4px; font-weight:bold; cursor:pointer;">Connect & Load Database</button>
                     
                     <button class="disconnect-btn" id="disconnect-btn" onclick="handleDisconnect()">🔌 Disconnect Database</button>
                 </div>
@@ -380,7 +389,7 @@ function doPost(e) {
                     </li>
                 </ol>
             </div>
-            <button onclick="closeModal('setup-modal')" style="width: 100%; background:#555; color:white; padding: 8px; border:none; border-radius: 4px; cursor: pointer;">Work Offline (Local Storage Only)</button>
+            <button onclick="closeModal('setup-modal')" style="width: 100%; background:#555; color:white; padding: 8px; border:none; border-radius: 4px; cursor: pointer; font-weight:bold;">Work Offline (Local Storage Only)</button>
         </div>
     </div>
 
@@ -443,7 +452,6 @@ function doPost(e) {
             const filter = document.getElementById('hometown-filter');
             const currentVal = filter.value;
             
-            // Get unique hometowns from entities, ignore blanks
             const uniqueHometowns = [...new Set(state.entities.map(e => e.hometown).filter(h => h && h.trim() !== ''))].sort();
             
             filter.innerHTML = '<option value="">Sort by Hometown...</option>';
@@ -551,6 +559,17 @@ function doPost(e) {
             
             fetchCloudData(true);
         }
+        
+        function copyGasUrl() {
+            const url = document.getElementById('setup-gas-url').value.trim();
+            if (!url) return alert("No URL to copy.");
+            navigator.clipboard.writeText(url).then(() => {
+                alert("✅ URL copied to clipboard!");
+            }).catch(err => {
+                console.error("Failed to copy text: ", err);
+                alert("Failed to copy. Please manually select the text and copy it.");
+            });
+        }
 
         function generateShareQRCode() {
             const qrContainer = document.getElementById("share-qrcode");
@@ -641,7 +660,6 @@ function doPost(e) {
                         id: npc.id || 'npc_' + Date.now() + Math.floor(Math.random() * 1000)
                     }));
                     
-                    // Filter out temps from the cloud overwrite just to be safe
                     state.entities = [...cloudPCs, ...cloudNPCs].filter(e => !e.isTemp);
                     saveLocalDatabase();
                     renderAll();
@@ -676,7 +694,6 @@ function doPost(e) {
         async function syncToCloud() {
             if (!GAS_WEB_APP_URL) return showSetupModalWithError("Please connect a database first.");
 
-            // Exclude temporary combatants from the cloud sync
             const permanentEntities = state.entities.filter(e => !e.isTemp);
             
             const pcsArray = permanentEntities.filter(e => e.isPC);
@@ -820,7 +837,7 @@ function doPost(e) {
                     if (ent.hideInCombat) return false; 
                     if (ent.hiddenThisCombat) return false; 
                 } else {
-                    if (ent.isTemp) return false; // Hide temps if combat ends but they linger
+                    if (ent.isTemp) return false; 
                 }
                 return true;
             }).sort((a, b) => {
@@ -903,9 +920,9 @@ function doPost(e) {
 
                     let actionHTML = '';
                     if (state.combatMode && (state.isDM || isOwner)) {
-                        actionHTML += `<button onclick="hideFromCombat('${ent.id}')" style="font-size:11px; background:#8e44ad; color:white; padding: 4px 8px; margin-right: 4px;" title="Hide from this combat">👻 Hide</button>`;
+                        actionHTML += `<button onclick="hideFromCombat('${ent.id}')" style="font-size:11px; background:#8e44ad; color:white; padding: 4px 8px; margin-right: 4px;" title="Hide from this combat" class="no-print">👻 Hide</button>`;
                         if (ent.isTemp) {
-                            actionHTML += `<button onclick="cloneEntity('${ent.id}')" style="font-size:11px; background:#f39c12; color:#111; padding: 4px 8px; margin-right: 4px;">👯 Clone</button>`;
+                            actionHTML += `<button onclick="cloneEntity('${ent.id}')" style="font-size:11px; background:#f39c12; color:#111; padding: 4px 8px; margin-right: 4px;" class="no-print">👯 Clone</button>`;
                         }
                     }
                     
@@ -985,9 +1002,9 @@ function doPost(e) {
                     
                     let actionHTML = '';
                     if (state.combatMode && (state.isDM || isOwner)) {
-                        actionHTML += `<button onclick="hideFromCombat('${ent.id}')" style="font-size:11px; background:#8e44ad; color:white; padding: 5px 10px; flex: 1;" title="Hide from this combat">👻 Hide</button>`;
+                        actionHTML += `<button onclick="hideFromCombat('${ent.id}')" style="font-size:11px; background:#8e44ad; color:white; padding: 5px 10px; flex: 1;" title="Hide from this combat" class="no-print">👻 Hide</button>`;
                         if (ent.isTemp) {
-                            actionHTML += `<button onclick="cloneEntity('${ent.id}')" style="font-size:11px; background:#f39c12; color:#111; padding: 5px 10px; flex: 1;">👯 Clone</button>`;
+                            actionHTML += `<button onclick="cloneEntity('${ent.id}')" style="font-size:11px; background:#f39c12; color:#111; padding: 5px 10px; flex: 1;" class="no-print">👯 Clone</button>`;
                         }
                     }
                     
@@ -1036,7 +1053,6 @@ function doPost(e) {
                 unhideBtn.style.display = 'none';
                 tempBtn.style.display = 'none';
                 
-                // Cleanup Combat State
                 state.entities = state.entities.filter(e => !e.isTemp);
                 state.entities.forEach(e => {
                     e.initiative = 0;
@@ -1145,7 +1161,6 @@ function doPost(e) {
             const clone = JSON.parse(JSON.stringify(ent)); 
             clone.id = 'temp_' + Date.now() + Math.floor(Math.random() * 1000);
             
-            // Generate numbered name (e.g. "Goblin (2)")
             let baseName = clone.name.replace(/\s\(\d+\)$/, '');
             const existingClones = state.entities.filter(e => e.name.startsWith(baseName));
             clone.name = `${baseName} (${existingClones.length + 1})`;
