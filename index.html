@@ -67,22 +67,24 @@
         .status-container { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 10px; }
         .status-pill { background: #e74c3c; color: white; padding: 3px 8px; border-radius: 12px; font-size: 11px; font-weight: bold; white-space: nowrap; }
         .status-pill.revived { background: #e67e22; }
+        .status-pill.deceased { background: #111; border: 1px solid #555; color: #e74c3c; }
         
         /* Forms & Inputs */
         input, select, textarea { width: 100%; padding: 8px; margin: 5px 0; border-radius: 4px; border: 1px solid #444; background: #1a1a20; color: white; box-sizing: border-box; }
-        .checkbox-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; background: #1a1a20; padding: 10px; border-radius: 4px; border: 1px solid #444; max-height: 150px; overflow-y: auto; }
+        .checkbox-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; background: #1a1a20; padding: 10px; border-radius: 4px; border: 1px solid #444; max-height: 200px; overflow-y: auto; }
         .checkbox-grid label { font-size: 12px; display: flex; align-items: center; gap: 5px; cursor: pointer; }
         .checkbox-grid input[type="checkbox"] { width: auto; margin: 0; }
 
         /* Buttons & UI */
         .controls { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
         .controls select, .controls button { height: 38px; box-sizing: border-box; margin: 0; padding: 0 15px; font-size: 14px; border-radius: 4px; border: none; font-weight: bold; cursor: pointer; transition: opacity 0.2s, background 0.2s; display: inline-flex; align-items: center; justify-content: center; }
+        .controls button:disabled { cursor: not-allowed; opacity: 0.5; }
         .controls select { width: auto; background: #1a1a20; border: 1px solid #444; color: white; }
         
         button.add-btn { background: #2ecc71; color: #111; }
         button.dm-btn { background: #9b59b6; color: white; }
         button.setup-btn { background: #8e44ad; color: white; }
-        button.disconnect-btn { background: #555; color: white; display: none; }
+        button.disconnect-btn { background: #555; color: white; width: 100%; margin-top: 10px; display: none; height: 40px; }
         button.combat-btn { background: #e74c3c; color: white; }
         button.combat-btn.active { background: #c0392b; border: 2px solid #fff; }
         button.rest-btn { background: #3498db; color: white; }
@@ -141,22 +143,22 @@
         <div class="controls">
             <select id="hometown-filter" onchange="renderAll()">
                 <option value="">Sort by Hometown...</option>
-            </select>
+                </select>
             <button class="view-btn" onclick="toggleView()">🗂️ Toggle View</button>
             <button class="combat-btn" id="combat-toggle-btn" onclick="toggleCombat()">⚔️ Toggle Combat</button>
-            <button class="rest-btn" onclick="triggerLongRest()">🏕️ Long Rest</button>
+            <button class="rest-btn" id="rest-btn" onclick="triggerLongRest()">🏕️ Long Rest</button>
             
-            <button class="cloud-btn pull" onclick="pullFromCloud()">☁️ Pull Data</button>
-            <button class="cloud-btn" onclick="syncToCloud()">☁️ Save to Cloud</button>
+            <button class="cloud-btn pull" id="cloud-pull-btn" onclick="pullFromCloud()">☁️ Pull Data</button>
+            <button class="cloud-btn" id="cloud-save-btn" onclick="syncToCloud()">☁️ Save</button>
             
-            <button class="add-btn" onclick="openAddModal()">+ New PC/NPC</button>
+            <button class="dm-btn" onclick="exportSessionLog()">📋 Copy Log</button>
+            <button class="add-btn" id="add-entity-btn" onclick="openAddModal()">+ New PC/NPC</button>
             
             <button class="login-btn" id="login-btn" onclick="openLoginModal()">Login</button>
             <button class="elevate-btn" id="elevate-btn" onclick="elevateToDM()">👑 Elevate DM</button>
             <button class="logout-btn" id="logout-btn" onclick="logout()">Logout</button>
             
             <button class="setup-btn" id="setup-btn" onclick="openSetupModal()">⚙️ Setup / Share</button>
-            <button class="disconnect-btn" id="disconnect-btn" onclick="handleDisconnect()">🔌 Disconnect</button>
         </div>
     </header>
 
@@ -172,13 +174,14 @@
 
             <input type="text" id="f-name" placeholder="Name">
             <input type="text" id="f-tagline" placeholder="Tagline (e.g. 'The brooding rogue')">
-            <input type="text" id="f-hometown" placeholder="Hometown (or select from list)">
+            <input type="text" id="f-hometown" placeholder="Hometown (Leave blank for unknown)">
             <textarea id="f-description" placeholder="Public Description"></textarea>
             <textarea id="f-secret" placeholder="Secret (DM/Owner Only)"></textarea>
             
-            <label style="font-size: 12px; margin-top: 10px; display: block;">
-                <input type="checkbox" id="f-travelling" style="width: auto;"> Currently travelling with party?
-            </label>
+            <div style="display: flex; gap: 15px; margin-top: 10px; margin-bottom: 10px;">
+                <label style="font-size: 12px; display: flex; align-items: center;"><input type="checkbox" id="f-travelling" style="width: auto; margin-right: 5px;"> Travelling with party?</label>
+                <label style="font-size: 12px; display: flex; align-items: center; color: #e74c3c;"><input type="checkbox" id="f-hide-combat" style="width: auto; margin-right: 5px;"> Hide from Combat Tracker</label>
+            </div>
 
             <h4 style="margin: 15px 0 5px 0;">Statuses</h4>
             <div class="checkbox-grid" id="status-grid">
@@ -219,6 +222,8 @@
                     <p style="font-size: 14px; margin-top: 0;">Provide your Google Apps Script Web App URL to sync data for this session. This URL is temporarily saved in your browser and wiped when closed.</p>
                     <input type="text" id="setup-gas-url" placeholder="https://script.google.com/macros/s/.../exec">
                     <button onclick="applyGasUrl()" class="add-btn" style="width: 100%; margin-top: 10px; height: 40px;">Connect & Load Database</button>
+                    
+                    <button class="disconnect-btn" id="disconnect-btn" onclick="handleDisconnect()">🔌 Disconnect Database</button>
                 </div>
                 
                 <div id="qr-section" style="display: none; text-align: center; background: #1a1a20; padding: 15px; border-radius: 6px; border: 1px solid #444;">
@@ -357,12 +362,12 @@ function doPost(e) {
         // --- CONSTANTS & DATA ---
         let GAS_WEB_APP_URL = null; 
         
-        const HOMETOWNS = ["Solomani Rim", "Terra", "Vanejen", "Spinward Marches", "Waterdeep", "Neverwinter", "Baldur's Gate"];
         const STATUSES = [
             "Blinded", "Charmed", "Deafened", "Frightened", "Grappled", 
             "Incapacitated", "Invisible", "Paralyzed", "Petrified", "Poisoned", 
-            "Prone", "Restrained", "Stunned", "Unconscious", "Exhaustion", 
-            "Dead", "Revived -3", "Revived -2", "Revived -1"
+            "Prone", "Restrained", "Stunned", "Unconscious", 
+            "Exhausted -1", "Exhausted -2", "Exhausted -3", "Exhausted -4", "Exhausted -5", "Exhausted -6",
+            "Deceased", "Revived -4", "Revived -3", "Revived -2", "Revived -1"
         ];
 
         // --- STATE MANAGEMENT ---
@@ -389,13 +394,6 @@ function doPost(e) {
 
             GAS_WEB_APP_URL = sessionStorage.getItem('GAS_WEB_APP_URL');
 
-            const filter = document.getElementById('hometown-filter');
-            HOMETOWNS.forEach(h => {
-                const opt = document.createElement('option');
-                opt.value = h; opt.innerText = h;
-                filter.appendChild(opt);
-            });
-
             const statusGrid = document.getElementById('status-grid');
             STATUSES.forEach(s => {
                 statusGrid.innerHTML += `<label><input type="checkbox" value="${s}" class="status-cb"> ${s}</label>`;
@@ -408,21 +406,46 @@ function doPost(e) {
             if (GAS_WEB_APP_URL) {
                 fetchCloudData(false);
             } else {
+                updateHometownDropdown();
                 openSetupModal();
             }
 
             renderAll();
         }
 
+        function updateHometownDropdown() {
+            const filter = document.getElementById('hometown-filter');
+            const currentVal = filter.value;
+            
+            // Get unique hometowns from entities, ignore blanks
+            const uniqueHometowns = [...new Set(state.entities.map(e => e.hometown).filter(h => h && h.trim() !== ''))].sort();
+            
+            filter.innerHTML = '<option value="">Sort by Hometown...</option>';
+            uniqueHometowns.forEach(h => {
+                const opt = document.createElement('option');
+                opt.value = h; opt.innerText = h;
+                filter.appendChild(opt);
+            });
+            
+            filter.value = currentVal; // Restore selection if still valid
+        }
+
         function updateConnectionUI() {
             const setupBtn = document.getElementById('setup-btn');
             const disconnectBtn = document.getElementById('disconnect-btn');
+            const cloudSaveBtn = document.getElementById('cloud-save-btn');
+            const cloudPullBtn = document.getElementById('cloud-pull-btn');
+            
             if (GAS_WEB_APP_URL) {
                 setupBtn.innerText = "⚙️ Share QR";
                 disconnectBtn.style.display = "inline-flex";
+                cloudSaveBtn.disabled = false;
+                cloudPullBtn.disabled = false;
             } else {
                 setupBtn.innerText = "⚙️ Setup DB";
                 disconnectBtn.style.display = "none";
+                cloudSaveBtn.disabled = true;
+                cloudPullBtn.disabled = true;
             }
         }
 
@@ -445,7 +468,7 @@ function doPost(e) {
                 setTimeout(() => {
                     if(disconnectArmed) {
                         disconnectArmed = false;
-                        btn.innerText = "🔌 Disconnect";
+                        btn.innerText = "🔌 Disconnect Database";
                         btn.style.background = "#555";
                     }
                 }, 5000);
@@ -455,8 +478,10 @@ function doPost(e) {
                 sessionStorage.removeItem('GAS_WEB_APP_URL');
                 GAS_WEB_APP_URL = null;
                 
-                btn.innerText = "🔌 Disconnect";
+                btn.innerText = "🔌 Disconnect Database";
                 btn.style.background = "#555";
+                
+                closeModal('setup-modal');
                 updateConnectionUI();
                 
                 window.history.replaceState({}, document.title, window.location.pathname);
@@ -551,6 +576,7 @@ function doPost(e) {
                 entities: state.entities
             };
             localStorage.setItem('dndDatabase', JSON.stringify(dbData));
+            updateHometownDropdown();
         }
 
         // --- GOOGLE APPS SCRIPT LOGIC (Cloud Sync & Logins) ---
@@ -601,6 +627,7 @@ function doPost(e) {
                             if (cloudPc.PIN) localPc.PIN = cloudPc.PIN;
                         }
                     });
+                    updateHometownDropdown();
                 }
             } catch (e) {
                 console.error("Failed to fetch data:", e);
@@ -716,13 +743,17 @@ function doPost(e) {
             const loginBtn = document.getElementById('login-btn');
             const elevateBtn = document.getElementById('elevate-btn');
             const logoutBtn = document.getElementById('logout-btn');
+            const addBtn = document.getElementById('add-entity-btn');
+            const restBtn = document.getElementById('rest-btn');
             
             if (state.currentUser) {
                 loginBtn.style.display = 'none';
                 elevateBtn.style.display = 'inline-flex';
                 logoutBtn.style.display = 'inline-flex';
-                
                 logoutBtn.innerText = `Logout (${state.currentUser})`;
+                
+                addBtn.disabled = false;
+                restBtn.disabled = false;
                 
                 if (state.isDM) {
                     elevateBtn.innerText = "🛑 Drop DM Status";
@@ -735,6 +766,9 @@ function doPost(e) {
                 loginBtn.style.display = 'inline-flex';
                 elevateBtn.style.display = 'none';
                 logoutBtn.style.display = 'none';
+                
+                addBtn.disabled = true;
+                restBtn.disabled = true;
             }
         }
 
@@ -751,14 +785,24 @@ function doPost(e) {
             
             container.className = state.viewMode === 'grid' ? 'grid-view' : 'table-container';
 
-            const displayList = [...state.entities].sort((a, b) => {
+            const displayList = [...state.entities].filter(ent => {
+                // Hide from combat if requested and in combat mode
+                if (state.combatMode && ent.hideInCombat) return false;
+                return true;
+            }).sort((a, b) => {
                 if (state.combatMode) {
-                    return (b.initiative || 0) - (a.initiative || 0);
+                    const initA = a.initiative || 0;
+                    const initB = b.initiative || 0;
+                    // Unassigned/0 Init stays at the very top
+                    if (initA === 0 && initB !== 0) return -1;
+                    if (initA !== 0 && initB === 0) return 1;
+                    return initB - initA || a.name.localeCompare(b.name);
                 }
+                
                 const getPriority = (ent) => {
-                    if (ent.isTravelling) return 4; 
-                    if (ent.isPC) return 3; 
-                    if (ent.hometown === selectedHometown) return 2; 
+                    if (ent.isPC) return 4; 
+                    if (ent.hometown === selectedHometown && selectedHometown !== '') return 3; 
+                    if (ent.isTravelling) return 2; 
                     return 1; 
                 };
                 return getPriority(b) - getPriority(a) || a.name.localeCompare(b.name);
@@ -784,14 +828,16 @@ function doPost(e) {
                 displayList.forEach(ent => {
                     const isOwner = (state.currentUser === ent.createdBy) || (state.currentCharacter && ent.name === state.currentCharacter);
                     const canSeeSecret = state.isDM || isOwner;
-                    const isDead = ent.statuses && ent.statuses.includes("Dead");
+                    const isDead = ent.statuses && ent.statuses.includes("Deceased");
                     
                     let tags = [];
                     if (ent.isPC) tags.push('<span class="badge badge-pc">PC</span>');
                     if (ent.isTravelling) tags.push('<span class="badge badge-travelling">PARTY</span>');
 
                     let statusHTML = (ent.statuses || []).map(s => {
-                        let pClass = s.includes("Revived") ? 'status-pill revived' : 'status-pill';
+                        let pClass = 'status-pill';
+                        if (s.includes("Revived")) pClass += ' revived';
+                        if (s.includes("Deceased")) pClass += ' deceased';
                         return `<span class="${pClass}">${s}</span>`;
                     }).join(' ');
 
@@ -841,7 +887,7 @@ function doPost(e) {
                 displayList.forEach(ent => {
                     const isOwner = (state.currentUser === ent.createdBy) || (state.currentCharacter && ent.name === state.currentCharacter);
                     const canSeeSecret = state.isDM || isOwner;
-                    const isDead = ent.statuses && ent.statuses.includes("Dead");
+                    const isDead = ent.statuses && ent.statuses.includes("Deceased");
                     
                     let classes = ['npc-card'];
                     if (ent.isPC) classes.push('pc');
@@ -861,7 +907,9 @@ function doPost(e) {
                     if (ent.statuses && ent.statuses.length > 0) {
                         statusHTML = `<div class="status-container">` + 
                             ent.statuses.map(s => {
-                                let pClass = s.includes("Revived") ? 'status-pill revived' : 'status-pill';
+                                let pClass = 'status-pill';
+                                if (s.includes("Revived")) pClass += ' revived';
+                                if (s.includes("Deceased")) pClass += ' deceased';
                                 return `<span class="${pClass}">${s}</span>`;
                             }).join('') + `</div>`;
                     }
@@ -929,33 +977,42 @@ function doPost(e) {
         }
 
         function triggerLongRest() {
-            if (!confirm("Trigger a Long Rest? This will clear temporary statuses and progress Revived statuses.")) return;
-            
-            const tempStatuses = ["Blinded", "Charmed", "Deafened", "Frightened", "Grappled", "Incapacitated", "Invisible", "Paralyzed", "Petrified", "Poisoned", "Prone", "Restrained", "Stunned", "Unconscious"];
+            if (!state.currentUser && !state.isDM) return alert("You must be logged in to perform this action.");
+            if (!confirm("Trigger a Long Rest? This will clear temporary statuses and automatically progress Exhausted and Revived penalties.")) return;
             
             state.entities.forEach(ent => {
                 if (!ent.statuses) ent.statuses = [];
                 
-                ent.statuses = ent.statuses.filter(s => !tempStatuses.includes(s));
+                let newStatuses = [];
                 
-                if (ent.statuses.includes("Revived -3")) {
-                    ent.statuses = ent.statuses.filter(s => s !== "Revived -3");
-                    ent.statuses.push("Revived -2");
-                } else if (ent.statuses.includes("Revived -2")) {
-                    ent.statuses = ent.statuses.filter(s => s !== "Revived -2");
-                    ent.statuses.push("Revived -1");
-                } else if (ent.statuses.includes("Revived -1")) {
-                    ent.statuses = ent.statuses.filter(s => s !== "Revived -1");
-                }
+                // Preserve Deceased status entirely
+                if (ent.statuses.includes("Deceased")) newStatuses.push("Deceased");
+                
+                // Progress Revived
+                if (ent.statuses.includes("Revived -4")) newStatuses.push("Revived -3");
+                else if (ent.statuses.includes("Revived -3")) newStatuses.push("Revived -2");
+                else if (ent.statuses.includes("Revived -2")) newStatuses.push("Revived -1");
+                else if (ent.statuses.includes("Revived -1")) { /* Cleared */ }
+                
+                // Progress Exhaustion
+                if (ent.statuses.includes("Exhausted -6")) newStatuses.push("Exhausted -5");
+                else if (ent.statuses.includes("Exhausted -5")) newStatuses.push("Exhausted -4");
+                else if (ent.statuses.includes("Exhausted -4")) newStatuses.push("Exhausted -3");
+                else if (ent.statuses.includes("Exhausted -3")) newStatuses.push("Exhausted -2");
+                else if (ent.statuses.includes("Exhausted -2")) newStatuses.push("Exhausted -1");
+                else if (ent.statuses.includes("Exhausted -1")) { /* Cleared */ }
+                
+                ent.statuses = newStatuses;
             });
             
             saveLocalDatabase();
             renderAll();
-            alert("Long Rest completed. Statuses updated.");
+            alert("Long Rest completed. Temporary statuses cleared, penalties updated.");
         }
 
         // --- ADD/EDIT/DELETE LOGIC ---
         function openAddModal() {
+            if (!state.currentUser && !state.isDM) return alert("You must be logged in to add a character.");
             document.getElementById('modal-title').innerText = "Add New Character";
             resetForm();
             document.getElementById('npc-modal').style.display = 'flex';
@@ -970,6 +1027,7 @@ function doPost(e) {
             document.getElementById('f-description').value = ent.description || '';
             document.getElementById('f-secret').value = ent.secret || '';
             document.getElementById('f-travelling').checked = ent.isTravelling;
+            document.getElementById('f-hide-combat').checked = ent.hideInCombat || false;
             
             document.querySelectorAll('.status-cb').forEach(cb => {
                 cb.checked = ent.statuses && ent.statuses.includes(cb.value);
@@ -994,6 +1052,13 @@ function doPost(e) {
 
             const existingEnt = state.entities.find(e => e.id === id) || {};
 
+            // Check for revival logic: If Deceased was removed from existing, automatically push Revived -4
+            if (existingEnt.statuses && existingEnt.statuses.includes("Deceased") && !activeStatuses.includes("Deceased")) {
+                if (!activeStatuses.includes("Revived -4")) {
+                    activeStatuses.push("Revived -4");
+                }
+            }
+
             const ent = {
                 ...existingEnt, 
                 id,
@@ -1004,6 +1069,7 @@ function doPost(e) {
                 description: document.getElementById('f-description').value.trim(),
                 secret: document.getElementById('f-secret').value.trim(),
                 isTravelling: document.getElementById('f-travelling').checked,
+                hideInCombat: document.getElementById('f-hide-combat').checked,
                 statuses: activeStatuses,
                 initiative: existingEnt.initiative || 0,
                 createdBy: existingEnt.createdBy || (state.currentUser || "DM")
@@ -1057,6 +1123,7 @@ function doPost(e) {
             document.getElementById('f-description').value = '';
             document.getElementById('f-secret').value = '';
             document.getElementById('f-travelling').checked = false;
+            document.getElementById('f-hide-combat').checked = false;
             document.querySelectorAll('.status-cb').forEach(cb => cb.checked = false);
             delete document.getElementById('npc-modal').dataset.editId;
         }
